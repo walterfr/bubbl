@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Bubbl" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/violet</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">@color/violet_dark</item>
+        <item name="colorOnPrimaryContainer">#EADFFF</item>
+        <item name="colorSecondary">@color/amber</item>
+        <item name="colorOnSecondary">#3A2500</item>
+        <item name="colorSecondaryContainer">#5C4200</item>
+        <item name="colorOnSecondaryContainer">#FFE2AE</item>
+        <item name="android:colorBackground">@color/ink</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_muted</item>
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="android:navigationBarColor">@color/ink</item>
+    </style>
+
+    <style name="Theme.Bubbl.Fullscreen" parent="Theme.Bubbl">
+        <item name="android:windowBackground">#000000</item>
+    </style>
+</resources>

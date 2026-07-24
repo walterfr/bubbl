@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Balão de fala -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,28 H66 A14,14 0 0 1 80,42 V50 A14,14 0 0 1 66,64 H50 L40,76 L46,64 H42 A14,14 0 0 1 28,50 V42 A14,14 0 0 1 42,28 Z" />
+
+    <!-- Lupa (anel) -->
+    <path
+        android:fillColor="#FFC24B"
+        android:fillType="evenOdd"
+        android:pathData="M72,60 m-13,0 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 M72,60 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+
+    <!-- Cabo da lupa -->
+    <path
+        android:strokeColor="#FFC24B"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M81,69 L90,78" />
+</vector>

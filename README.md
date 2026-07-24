@@ -1,36 +1,101 @@
-# Bubbl — Comic & Manga Reader
+<div align="center">
 
-Leitor Android (Kotlin). Toque na página = zoom automático ancorado no ponto tocado (o "balão"). Toque de novo = volta.
+# Bubbl.
 
-## Formatos
-- **CBZ / ZIP** — imagens em arquivo (java.util.zip)
-- **CBR / RAR** — via junrar
-- **PDF** — PdfRenderer nativo do Android
-- **EPUB (fixed-layout)** — extrai imagens do container (aproxima ordem por nome)
-- **Imagens soltas** — jpg/png/webp/gif/bmp
-- **Pasta** — seletor de árvore (SAF)
+**Leitor de mangás e quadrinhos para Android — toque no balão, zoom na hora.**
 
-## Como rodar
-1. Abrir a pasta no **Android Studio** (Hedgehog+). Ele gera o `gradlew` e baixa o SDK.
-2. Rodar `:app` num emulador/dispositivo (minSdk 24).
-3. Botão **Abrir arquivo** ou **Abrir pasta** → ler.
+[![CI](https://github.com/walterfr/bubbl/actions/workflows/android.yml/badge.svg)](https://github.com/walterfr/bubbl/actions/workflows/android.yml)
+![minSdk](https://img.shields.io/badge/minSdk-26-blue)
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-Teste da ordenação de páginas: `./gradlew test`.
+<img src="docs/img/home.png" width="640" alt="Tela inicial do Bubbl."/>
 
-## Como funciona o zoom
-`SubsamplingScaleImageView` faz tiling de páginas grandes. Um `GestureDetector`
-captura o toque único e chama `animateScaleAndCenter` no ponto tocado
-convertido pra coordenada da imagem. Sem IA, funciona em qualquer formato.
+</div>
 
-## Limitações atuais (MVP) e próximos passos
-- **Zoom por ponto, não por balão real.** Detecção de balão/painel por visão
-  computacional (OpenCV/YOLO) fica pra depois. Alternativa boa: ler painéis
-  pré-mapeados (ACBF) quando existirem.
-- **PDF/arquivos são extraídos inteiros pro cache ao abrir** — simples e robusto,
-  mas usa disco e demora em livros grandes. Trocar por carga sob demanda por página
-  se virar gargalo.
-- **EPUB** trata como zip de imagens (ordem por nome). Parse do OPF/spine e
-  render de HTML só se aparecer EPUB de quadrinho baseado em texto.
-- **Direção de leitura fixa (esquerda→direita).** Mangá costuma ser
-  direita→esquerda — adicionar toggle (RTL no ViewPager2).
-- Sem biblioteca/histórico/marcadores. Abre um livro por vez.
+---
+
+## O que é
+
+Bubbl. abre arquivos de quadrinho/mangá e deixa a leitura fluida numa ideia central: **um toque na página dá zoom automático ancorado no ponto tocado** — o balão de diálogo que você quer ler. Toca de novo, volta pro enquadramento da página. Sem menus, sem pinça.
+
+## Recursos
+
+- **Zoom no toque** ancorado no ponto (o balão), com animação suave.
+- **Tiling de imagens grandes** — páginas de mangá em alta resolução sem estourar memória.
+- **Leitura imersiva** — barras de sistema escondidas, chrome translúcido (voltar, contador, slider de página).
+- **Vários formatos** num pipeline único.
+- **Material 3** (tema escuro), ícone adaptativo vetorial.
+
+## Formatos suportados
+
+| Formato | Como é lido |
+|---|---|
+| **CBZ / ZIP** | Imagens no arquivo (`java.util.zip`) |
+| **CBR / RAR** | [junrar](https://github.com/junrar/junrar) |
+| **PDF** | `PdfRenderer` nativo do Android (sem lib) |
+| **EPUB** (fixed-layout) | Imagens do container, ordem por nome |
+| **Imagens** | JPG · PNG · WEBP · GIF · BMP |
+| **Pasta** | Seletor de árvore (SAF / `DocumentFile`) |
+
+Tudo é convertido numa **lista única de páginas** (`Uri`), então o visualizador trata todo formato igual. Detalhes em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Gestos
+
+| Gesto | Ação |
+|---|---|
+| **Toque** | Zoom automático no ponto tocado / volta ao enquadramento |
+| **Toque duplo** | Zoom nativo no ponto |
+| **Pinça** | Zoom livre |
+| **Arrastar** | Pan (quando com zoom) |
+| **Deslizar horizontal** | Trocar de página |
+| **Slider inferior** | Pular para qualquer página |
+
+## Build & Run
+
+Requisitos: **JDK 17**, Android SDK (platform 34), um dispositivo/emulador **Android 8.0+ (API 26)**.
+
+```bash
+git clone https://github.com/walterfr/bubbl.git
+cd bubbl
+./gradlew installDebug     # compila e instala no dispositivo conectado
+```
+
+Só gerar o APK:
+
+```bash
+./gradlew assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
+```
+
+Rodar os testes:
+
+```bash
+./gradlew test
+```
+
+> No Windows, use `gradlew.bat`. Ou abra a pasta no **Android Studio** (Hedgehog+) e rode a config `app`.
+
+## Stack
+
+- **Kotlin** · Android Views · Material 3
+- [SubsamplingScaleImageView](https://github.com/davemorrissey/subsampling-scale-image-view) — pan/zoom + tiling
+- ViewPager2 · Coroutines · DocumentFile
+- `PdfRenderer` (nativo) · junrar (CBR)
+
+## Roadmap
+
+- [ ] Detecção real de balão/painel (visão computacional ou metadados ACBF) — hoje o zoom é no ponto tocado.
+- [ ] Direção de leitura direita→esquerda (mangá).
+- [ ] Biblioteca / histórico / marcadores / continuar de onde parou.
+- [ ] Carga de páginas sob demanda (hoje extrai o livro inteiro pro cache ao abrir).
+- [ ] EPUB baseado em texto (parse de OPF/spine + render HTML).
+
+Veja limitações detalhadas em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#limitações-conhecidas).
+
+## Contribuindo
+
+PRs e issues são bem-vindos. Leia [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licença
+
+[MIT](LICENSE) © Walter Franchetti

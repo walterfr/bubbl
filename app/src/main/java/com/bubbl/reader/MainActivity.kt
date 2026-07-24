@@ -38,6 +38,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnOpenFolder).setOnClickListener {
             pickFolder.launch(null)
         }
+        findViewById<android.widget.ImageButton>(R.id.btnAbout).setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
     }
 
     private fun open(uri: Uri, folder: Boolean) {

@@ -7,8 +7,8 @@
         <item name="colorOnPrimaryContainer">#EADFFF</item>
         <item name="colorSecondary">@color/amber</item>
         <item name="colorOnSecondary">#3A2500</item>
-        <item name="colorSecondaryContainer">#5C4200</item>
-        <item name="colorOnSecondaryContainer">#FFE2AE</item>
+        <item name="colorSecondaryContainer">#322C4D</item>
+        <item name="colorOnSecondaryContainer">#E6DEFF</item>
         <item name="android:colorBackground">@color/ink</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorSurfaceVariant">@color/surface_variant</item>

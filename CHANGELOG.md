@@ -15,6 +15,8 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   contador e slider de página.
 - **Logo/ícone** balão + lupa como ícone adaptativo vetorial (com monochrome
   para ícones temáticos do Android 13+).
+- **Tela Sobre** com versão, links (GitHub, Instagram, contato) e apoio ao
+  projeto: GitHub Sponsors, Ko-fi, Buy Me a Coffee e PIX copia-e-cola.
 - CI (GitHub Actions): `assembleDebug` + `test`.
 
 ### Notas

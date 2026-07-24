@@ -98,4 +98,4 @@ PRs e issues são bem-vindos. Leia [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licença
 
-[MIT](LICENSE) © Walter Franchetti
+[MIT](LICENSE) © Walter Rebouças

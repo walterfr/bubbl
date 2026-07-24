@@ -22,5 +22,9 @@
             android:name=".ReaderActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:theme="@style/Theme.Bubbl.Fullscreen" />
+
+        <activity
+            android:name=".AboutActivity"
+            android:parentActivityName=".MainActivity" />
     </application>
 </manifest>

@@ -1,0 +1,10 @@
+* text=auto
+*.kt   text
+*.kts  text
+*.xml  text
+gradlew text eol=lf
+*.bat text eol=crlf
+gradle-wrapper.jar binary
+*.png binary
+*.jpg binary
+*.webp binary

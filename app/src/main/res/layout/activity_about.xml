@@ -177,7 +177,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="PIX · Fortaleza-CE"
+                            android:text="PIX"
                             android:textColor="@color/on_surface_muted"
                             android:textSize="12sp"
                             android:letterSpacing="0.04"

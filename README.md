@@ -84,7 +84,8 @@ Rodar os testes:
 
 ## Roadmap
 
-- [ ] Detecção real de balão/painel (visão computacional ou metadados ACBF) — hoje o zoom é no ponto tocado.
+- [x] Zoom no balão: isola o balão sob o toque (flood-fill) e **infla ~2x no lugar**; cai no zoom no ponto quando não detecta.
+- [ ] Detecção robusta de balão (OpenCV ou modelo ML) para os casos que a heurística erra.
 - [ ] Direção de leitura direita→esquerda (mangá).
 - [ ] Biblioteca / histórico / marcadores / continuar de onde parou.
 - [ ] Carga de páginas sob demanda (hoje extrai o livro inteiro pro cache ao abrir).

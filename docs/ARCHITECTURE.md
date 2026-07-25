@@ -47,26 +47,31 @@ ignorando zeros à esquerda. Implementação e teste:
 [`PageLoader.compareNatural`](../app/src/main/java/com/bubbl/reader/PageLoader.kt) ·
 [`NaturalOrderTest.kt`](../app/src/test/java/com/bubbl/reader/NaturalOrderTest.kt).
 
-## Zoom no toque (o recurso central)
+## Zoom no balão (o recurso central)
 
-Em `ReaderActivity`, cada página tem um `GestureDetector`:
+Toque numa página em `ReaderActivity`:
 
-1. `onSingleTapConfirmed` converte o ponto tocado em coordenada da imagem com
-   `viewToSourceCoord(x, y)`.
-2. Se já estiver com zoom, volta ao enquadramento (`minScale`); senão, dá zoom
-   (`minScale * 2.8`) **centrado no ponto** via `animateScaleAndCenter`.
+1. `viewToSourceCoord` converte o toque em coordenada da imagem.
+2. [`BalloonDetector`](../app/src/main/java/com/bubbl/reader/BalloonDetector.kt)
+   cresce uma região (flood-fill) a partir do ponto sobre pixels de brilho
+   parecido até o contorno do balão, e devolve o bounding box. Rejeita quando
+   vaza (fração/raio de preenchimento) — aí não era balão.
+3. Achou o balão: recorta nítido com `BitmapRegionDecoder`, posiciona o recorte
+   **sobre onde o balão está** (`sourceToViewCoord`) e **infla ~2x no lugar**
+   (anima `scaleX/scaleY`), com a página levemente escurecida atrás. Toque fecha.
+4. Não achou: cai no **zoom no ponto** via `animateScaleAndCenter` (fallback).
 
 O `OnTouchListener` retorna `false`, então o `SubsamplingScaleImageView` ainda
-processa pan/pinça/toque-duplo normalmente — o toque único apenas adiciona o
-zoom inteligente por cima.
+processa pan/pinça/toque-duplo normalmente.
 
-> Isto é **zoom no ponto tocado**, não detecção real do balão. Funciona em
-> qualquer formato sem processamento prévio. Detecção de balão/painel de
-> verdade (visão computacional ou metadados) é trabalho futuro.
+> A detecção é heurística (flood-fill), boa em balão de interior uniforme com
+> contorno fechado. Balão colorido/aberto/invertido pode não isolar → fallback.
+> Upgrade: OpenCV (morfologia) ou modelo ML de detecção de balão.
 
 ## Limitações conhecidas
 
-- **Zoom por ponto, não por balão.** Sem visão computacional/ACBF.
+- **Detecção de balão é heurística.** Flood-fill isola balão de interior
+  uniforme; casos difíceis caem no zoom no ponto. Robustez real = OpenCV/ML.
 - **Extração antecipada.** O livro inteiro é extraído pro `cacheDir` ao abrir —
   simples e robusto, mas usa disco e demora em livros grandes. Trocar por carga
   sob demanda por página se virar gargalo.

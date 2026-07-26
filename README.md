@@ -44,8 +44,8 @@ Tudo é convertido numa **lista única de páginas** (`Uri`), então o visualiza
 
 | Gesto | Ação |
 |---|---|
-| **Toque** | Zoom automático no ponto tocado / volta ao enquadramento |
-| **Toque duplo** | Zoom nativo no ponto |
+| **Toque** | Amplia o balão sob o dedo (no formato dele) |
+| **Toque duplo** | Zoom normal do documento |
 | **Pinça** | Zoom livre |
 | **Arrastar** | Pan (quando com zoom) |
 | **Deslizar horizontal** | Trocar de página |
@@ -84,7 +84,7 @@ Rodar os testes:
 
 ## Roadmap
 
-- [x] Zoom no balão: isola o balão sob o toque (flood-fill) e **infla ~2x no lugar**; cai no zoom no ponto quando não detecta.
+- [x] Zoom no balão: **toque único** isola o balão (flood-fill) e infla ~2x no seu formato; **toque duplo** dá o zoom normal do documento.
 - [ ] Detecção robusta de balão (OpenCV ou modelo ML) para os casos que a heurística erra.
 - [ ] Direção de leitura direita→esquerda (mangá).
 - [ ] Biblioteca / histórico / marcadores / continuar de onde parou.

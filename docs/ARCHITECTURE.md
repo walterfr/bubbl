@@ -61,10 +61,11 @@ Toque numa página em `ReaderActivity`:
    posiciona o recorte **sobre onde o balão está** (`sourceToViewCoord`) e
    **infla ~2x no lugar** (anima `scaleX/scaleY`), com a página levemente
    escurecida atrás. Toque fecha.
-4. Não achou: cai no **zoom no ponto** via `animateScaleAndCenter` (fallback).
+4. Não achou balão: o toque único não faz nada.
 
-O `OnTouchListener` retorna `false`, então o `SubsamplingScaleImageView` ainda
-processa pan/pinça/toque-duplo normalmente.
+**Toque único** só amplia balão; **toque duplo** dá o zoom normal do documento
+(`SubsamplingScaleImageView`) — separados de propósito, pra não confundir. O
+`OnTouchListener` retorna `false`, então o SSIV ainda processa pan/pinça/duplo-toque.
 
 > A detecção é heurística (flood-fill), boa em balão de interior uniforme com
 > contorno fechado. Balão colorido/aberto/invertido pode não isolar → fallback.

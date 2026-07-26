@@ -98,8 +98,9 @@ class ReaderActivity : AppCompatActivity() {
                 BalloonDetector.shapedCrop(contentResolver, uri, det)
             } else null
 
+            // Toque único só amplia o balão. Sem balão: nada.
+            // Zoom normal do documento = toque duplo (tratado pelo SubsamplingScaleImageView).
             if (bmp != null && det != null) showBalloon(view, det.rect, bmp)
-            else fallbackZoom(view, sx, sy)
         }
     }
 
@@ -107,7 +108,7 @@ class ReaderActivity : AppCompatActivity() {
     private fun showBalloon(view: SubsamplingScaleImageView, rect: Rect, bmp: Bitmap) {
         val tl = view.sourceToViewCoord(rect.left.toFloat(), rect.top.toFloat())
         val br = view.sourceToViewCoord(rect.right.toFloat(), rect.bottom.toFloat())
-        if (tl == null || br == null) { fallbackZoom(view, rect.exactCenterX(), rect.exactCenterY()); return }
+        if (tl == null || br == null) { bmp.recycle(); return }
 
         val lp = balloonImage.layoutParams as FrameLayout.LayoutParams
         lp.gravity = Gravity.TOP or Gravity.START
@@ -139,15 +140,6 @@ class ReaderActivity : AppCompatActivity() {
             balloonBmp = null
         }.start()
         overlay.animate().alpha(0f).setDuration(150).start()
-    }
-
-    /** Sem balão: zoom animado no ponto tocado (comportamento antigo). */
-    private fun fallbackZoom(view: SubsamplingScaleImageView, sx: Float, sy: Float) {
-        if (!view.isReady) return
-        val fit = view.minScale
-        val zoomedIn = view.scale > fit * 1.6f
-        val target = if (zoomedIn) fit else fit * 2.8f
-        view.animateScaleAndCenter(target, PointF(sx, sy))?.withDuration(280)?.start()
     }
 
     override fun onDestroy() {

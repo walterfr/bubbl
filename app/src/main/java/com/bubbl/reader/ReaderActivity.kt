@@ -91,14 +91,14 @@ class ReaderActivity : AppCompatActivity() {
         val srcW = view.sWidth
         val srcH = view.sHeight
         lifecycleScope.launch {
-            val rect: Rect? = withContext(Dispatchers.Default) {
+            val det = withContext(Dispatchers.Default) {
                 BalloonDetector.detect(contentResolver, uri, sx, sy, srcW, srcH)
             }
-            val bmp: Bitmap? = if (rect != null) withContext(Dispatchers.IO) {
-                BalloonDetector.crop(contentResolver, uri, rect)
+            val bmp: Bitmap? = if (det != null) withContext(Dispatchers.IO) {
+                BalloonDetector.shapedCrop(contentResolver, uri, det)
             } else null
 
-            if (bmp != null && rect != null) showBalloon(view, rect, bmp)
+            if (bmp != null && det != null) showBalloon(view, det.rect, bmp)
             else fallbackZoom(view, sx, sy)
         }
     }

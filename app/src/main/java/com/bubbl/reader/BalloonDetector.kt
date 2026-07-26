@@ -4,6 +4,10 @@ import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.net.Uri
 
@@ -23,17 +27,22 @@ object BalloonDetector {
     private const val MAX_FILL_FRAC = 0.35f  // acima disso, vazou = não é balão
     private const val MIN_FILL_RATIO = 0.40f // preenchido/bbox baixo = vazou p/ calha
 
+    private const val DILATE = 3  // px (escala reduzida) p/ englobar o contorno do balão
+
     /** Bounding box puro (sem android.graphics, p/ ser testável em JVM). */
     data class Bounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
         val width get() = right - left
         val height get() = bottom - top
     }
 
+    /** Resultado: retângulo na resolução original + máscara alpha no formato do balão. */
+    class Detection(val rect: Rect, val mask: Bitmap)
+
     /** Roda em thread de background. srcW/srcH = dimensões reais da página. */
     fun detect(
         resolver: ContentResolver, uri: Uri,
         srcX: Float, srcY: Float, srcW: Int, srcH: Int
-    ): Rect? {
+    ): Detection? {
         if (srcW <= 0 || srcH <= 0) return null
         val small = decodeScaled(resolver, uri) ?: return null
         try {
@@ -43,30 +52,75 @@ object BalloonDetector {
 
             var sx = (srcX / srcW * w).toInt().coerceIn(0, w - 1)
             var sy = (srcY / srcH * h).toInt().coerceIn(0, h - 1)
-            // tocou no texto escuro dentro do balão? re-semeia num pixel claro perto.
             adjustSeed(px, w, h, sx, sy)?.let { sx = it % w; sy = it / w }
 
-            val box = floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO)
+            val seen = BooleanArray(w * h)
+            val box = floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO, seen)
                 ?: return null
 
-            // mapeia p/ resolução original + padding
-            val fx = srcW.toFloat() / w
-            val fy = srcH.toFloat() / h
-            val padX = (box.width * fx * 0.04f).toInt()
-            val padY = (box.height * fy * 0.04f).toInt()
-            return Rect(
-                (box.left * fx - padX).toInt().coerceIn(0, srcW - 1),
-                (box.top * fy - padY).toInt().coerceIn(0, srcH - 1),
-                (box.right * fx + padX).toInt().coerceIn(1, srcW),
-                (box.bottom * fy + padY).toInt().coerceIn(1, srcH)
-            ).takeIf { it.width() > 8 && it.height() > 8 }
+            // expande o bbox p/ dar espaço ao contorno (dilatação)
+            val ex0 = (box.left - DILATE).coerceAtLeast(0)
+            val ey0 = (box.top - DILATE).coerceAtLeast(0)
+            val ex1 = (box.right + DILATE).coerceAtMost(w)
+            val ey1 = (box.bottom + DILATE).coerceAtMost(h)
+            val bw = ex1 - ex0; val bh = ey1 - ey0
+            if (bw < 4 || bh < 4) return null
+
+            // máscara: opaca onde a região (dilatada) cobre = formato do balão
+            val maskPx = IntArray(bw * bh)
+            for (yy in 0 until bh) for (xx in 0 until bw) {
+                maskPx[yy * bw + xx] = if (dilatedAt(seen, w, h, ex0 + xx, ey0 + yy, DILATE)) -1 else 0
+            }
+            val mask = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
+            mask.setPixels(maskPx, 0, bw, 0, 0, bw, bh)
+
+            val fx = srcW.toFloat() / w; val fy = srcH.toFloat() / h
+            val rect = Rect(
+                (ex0 * fx).toInt().coerceIn(0, srcW - 1),
+                (ey0 * fy).toInt().coerceIn(0, srcH - 1),
+                (ex1 * fx).toInt().coerceIn(1, srcW),
+                (ey1 * fy).toInt().coerceIn(1, srcH)
+            )
+            if (rect.width() <= 8 || rect.height() <= 8) { mask.recycle(); return null }
+            return Detection(rect, mask)
         } finally {
             small.recycle()
         }
     }
 
-    /** Recorte nítido do balão em alta resolução. */
-    fun crop(resolver: ContentResolver, uri: Uri, rect: Rect): Bitmap? {
+    private fun dilatedAt(seen: BooleanArray, w: Int, h: Int, gx: Int, gy: Int, r: Int): Boolean {
+        var dy = -r
+        while (dy <= r) {
+            var dx = -r
+            while (dx <= r) {
+                val nx = gx + dx; val ny = gy + dy
+                if (nx in 0 until w && ny in 0 until h && seen[ny * w + nx]) return true
+                dx++
+            }
+            dy++
+        }
+        return false
+    }
+
+    /** Recorte no formato do balão: recorte nítido do bbox mascarado pela silhueta. */
+    fun shapedCrop(resolver: ContentResolver, uri: Uri, det: Detection): Bitmap? {
+        val crop = crop(resolver, uri, det.rect)
+        if (crop == null) { det.mask.recycle(); return null }
+        val scaledMask = Bitmap.createScaledBitmap(det.mask, crop.width, crop.height, true)
+        val out = Bitmap.createBitmap(crop.width, crop.height, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawBitmap(crop, 0f, 0f, null)
+            drawBitmap(scaledMask, 0f, 0f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+                })
+        }
+        crop.recycle(); scaledMask.recycle(); det.mask.recycle()
+        return out
+    }
+
+    /** Recorte retangular nítido do balão em alta resolução. */
+    private fun crop(resolver: ContentResolver, uri: Uri, rect: Rect): Bitmap? {
         return resolver.openInputStream(uri)?.use { ins ->
             @Suppress("DEPRECATION")
             val dec = BitmapRegionDecoder.newInstance(ins, false) ?: return null
@@ -86,12 +140,13 @@ object BalloonDetector {
      */
     fun floodFillBounds(
         px: IntArray, w: Int, h: Int, sx: Int, sy: Int,
-        tol: Int, maxFrac: Float, minFillRatio: Float = 0f
+        tol: Int, maxFrac: Float, minFillRatio: Float = 0f,
+        outSeen: BooleanArray? = null
     ): Bounds? {
         val n = w * h
         if (sx !in 0 until w || sy !in 0 until h) return null
         val base = lum(px[sy * w + sx])
-        val seen = BooleanArray(n)
+        val seen = outSeen ?: BooleanArray(n)
         val stack = IntArray(n)
         var sp = 0
         stack[sp++] = sy * w + sx

@@ -6,8 +6,9 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
-- **Zoom no balão**: o toque isola o balão sob o dedo (flood-fill) e o **infla
-  ~2x no lugar** sobre a página; sem detecção, cai no zoom no ponto.
+- **Zoom no balão**: o toque isola o balão sob o dedo (flood-fill), recorta
+  **no formato da silhueta do balão** (máscara alpha) e o **infla ~2x no lugar**
+  sobre a página; sem detecção, cai no zoom no ponto.
 - Leitor com pan/zoom e tiling de imagens grandes via
   `SubsamplingScaleImageView`.
 - Suporte a **CBZ/ZIP, CBR/RAR, PDF, EPUB (fixed-layout), imagens e pasta**,

@@ -56,9 +56,11 @@ Toque numa página em `ReaderActivity`:
    cresce uma região (flood-fill) a partir do ponto sobre pixels de brilho
    parecido até o contorno do balão, e devolve o bounding box. Rejeita quando
    vaza (fração/raio de preenchimento) — aí não era balão.
-3. Achou o balão: recorta nítido com `BitmapRegionDecoder`, posiciona o recorte
-   **sobre onde o balão está** (`sourceToViewCoord`) e **infla ~2x no lugar**
-   (anima `scaleX/scaleY`), com a página levemente escurecida atrás. Toque fecha.
+3. Achou o balão: recorta nítido com `BitmapRegionDecoder` e **mascara no formato
+   da silhueta** (máscara alpha da região dilatada, via `PorterDuff.DST_IN`),
+   posiciona o recorte **sobre onde o balão está** (`sourceToViewCoord`) e
+   **infla ~2x no lugar** (anima `scaleX/scaleY`), com a página levemente
+   escurecida atrás. Toque fecha.
 4. Não achou: cai no **zoom no ponto** via `animateScaleAndCenter` (fallback).
 
 O `OnTouchListener` retorna `false`, então o `SubsamplingScaleImageView` ainda

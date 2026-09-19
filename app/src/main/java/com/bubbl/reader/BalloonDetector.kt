@@ -10,6 +10,13 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.net.Uri
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.core.MatOfPoint
+import org.opencv.core.Rect as OpenCvRect
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
 
 /**
  * Detecta o balão sob o ponto tocado por crescimento de região (flood fill):
@@ -26,6 +33,8 @@ object BalloonDetector {
     private const val TOL = 40               // tolerância de brilho no flood fill
     private const val MAX_FILL_FRAC = 0.35f  // acima disso, vazou = não é balão
     private const val MIN_FILL_RATIO = 0.40f // preenchido/bbox baixo = vazou p/ calha
+    private const val LOCAL_SEARCH_MAX_RATIO = 0.45f // área local máxima para um balão válido
+    private const val LOCAL_SEARCH_RADIUS_FACTOR = 0.5f // raio local em torno do toque
 
     private const val DILATE = 3  // px (escala reduzida) p/ englobar o contorno do balão
 
@@ -55,7 +64,9 @@ object BalloonDetector {
             adjustSeed(px, w, h, sx, sy)?.let { sx = it % w; sy = it / w }
 
             val seen = BooleanArray(w * h)
-            val box = floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO, seen)
+            val box = localBalloonBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO)
+                ?: contourBounds(small, sx, sy)
+                ?: floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO, seen)
                 ?: return null
 
             // expande o bbox p/ dar espaço ao contorno (dilatação)
@@ -85,6 +96,90 @@ object BalloonDetector {
             return Detection(rect, mask)
         } finally {
             small.recycle()
+        }
+    }
+
+    private fun contourBounds(bitmap: Bitmap, sx: Int, sy: Int): Bounds? {
+        if (!ensureOpenCvLoaded()) return null
+
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) return null
+
+        val rgba = Mat()
+        val gray = Mat()
+        val blurred = Mat()
+        val threshold = Mat()
+        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(5.0, 5.0))
+
+        try {
+            Utils.bitmapToMat(bitmap, rgba)
+            Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY)
+            Imgproc.GaussianBlur(gray, blurred, Size(5.0, 5.0), 0.0)
+            Imgproc.adaptiveThreshold(
+                blurred, threshold, 255.0,
+                Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C,
+                Imgproc.THRESH_BINARY_INV,
+                31,
+                10.0
+            )
+            Imgproc.morphologyEx(threshold, threshold, Imgproc.MORPH_CLOSE, kernel)
+
+            val contours = ArrayList<MatOfPoint>()
+            val hierarchy = Mat()
+            Imgproc.findContours(
+                threshold,
+                contours,
+                hierarchy,
+                Imgproc.RETR_EXTERNAL,
+                Imgproc.CHAIN_APPROX_SIMPLE
+            )
+
+            val maxArea = (width * height * 0.40f).toDouble()
+            val minArea = (width * height * 0.003f).toDouble()
+            var best: Bounds? = null
+            var bestScore = Float.NEGATIVE_INFINITY
+
+            for (contour in contours) {
+                val box = Imgproc.boundingRect(contour)
+                val area = box.width * box.height
+                if (area <= 0 || area < minArea || area > maxArea) continue
+
+                val contourArea = Imgproc.contourArea(contour)
+                val fillRatio = if (area > 0) contourArea / area.toDouble() else 0.0
+                if (fillRatio < 0.12 || fillRatio > 0.95) continue
+
+                val touchX = sx.coerceIn(box.x, box.x + box.width)
+                val touchY = sy.coerceIn(box.y, box.y + box.height)
+                val centerX = box.x + box.width / 2.0
+                val centerY = box.y + box.height / 2.0
+                val distance = kotlin.math.hypot((touchX - centerX).toDouble(), (touchY - centerY).toDouble())
+                val localRadius = maxOf(24.0, minOf(width.toDouble(), height.toDouble()) * 0.35)
+                if (distance > localRadius) continue
+
+                val score = (fillRatio.toFloat() * 4.0f) - ((distance / localRadius).toFloat() * 1.5f)
+                if (score > bestScore) {
+                    bestScore = score
+                    best = Bounds(box.x, box.y, box.x + box.width, box.y + box.height)
+                }
+            }
+
+            return best
+        } finally {
+            rgba.release()
+            gray.release()
+            blurred.release()
+            threshold.release()
+        }
+    }
+
+    private fun ensureOpenCvLoaded(): Boolean {
+        return try {
+            OpenCVLoader.initDebug(); true
+        } catch (_: UnsatisfiedLinkError) {
+            false
+        } catch (_: RuntimeException) {
+            false
         }
     }
 
@@ -132,6 +227,76 @@ object BalloonDetector {
     }
 
     // --- lógica pura, testável ---
+
+    /**
+     * Busca o balão dentro de um raio local em torno do toque para evitar que um
+     * fundo uniforme ou uma área grande do quadro seja aceita como balão.
+     */
+    fun localBalloonBounds(
+        px: IntArray, w: Int, h: Int, sx: Int, sy: Int,
+        tol: Int, maxFrac: Float, minFillRatio: Float = 0f
+    ): Bounds? {
+        if (sx !in 0 until w || sy !in 0 until h) return null
+        if (w <= 0 || h <= 0) return null
+
+        val base = lum(px[sy * w + sx])
+        val n = w * h
+        val maxRadius = maxOf(32, minOf(w, h) / 2).coerceAtMost(minOf(w, h))
+        val seen = BooleanArray(n)
+        val stack = IntArray(n)
+        var sp = 0
+        stack[sp++] = sy * w + sx
+        seen[sy * w + sx] = true
+
+        var minX = sx; var maxX = sx; var minY = sy; var maxY = sy
+        var count = 0
+        val limit = (n * maxFrac).toInt()
+
+        while (sp > 0) {
+            val idx = stack[--sp]
+            val x = idx % w; val y = idx / w
+
+            if (minX > x) minX = x
+            if (maxX < x) maxX = x
+            if (minY > y) minY = y
+            if (maxY < y) maxY = y
+            count++
+            if (count > limit) return null
+
+            val dxBase = x - sx; val dyBase = y - sy
+            if (dxBase * dxBase + dyBase * dyBase > maxRadius * maxRadius) continue
+
+            if (x > 0)     sp = tryPushLocal(px, seen, stack, sp, idx - 1, base, tol, sx, sy, maxRadius, w)
+            if (x < w - 1) sp = tryPushLocal(px, seen, stack, sp, idx + 1, base, tol, sx, sy, maxRadius, w)
+            if (y > 0)     sp = tryPushLocal(px, seen, stack, sp, idx - w, base, tol, sx, sy, maxRadius, w)
+            if (y < h - 1) sp = tryPushLocal(px, seen, stack, sp, idx + w, base, tol, sx, sy, maxRadius, w)
+        }
+
+        if (count == 0) return null
+        val touchesAll = minX == 0 && minY == 0 && maxX == w - 1 && maxY == h - 1
+        if (touchesAll) return null
+
+        val bw = maxX - minX + 1; val bh = maxY - minY + 1
+        if (count < minFillRatio * bw * bh) return null
+        if ((bw * bh).toFloat() > w * h * LOCAL_SEARCH_MAX_RATIO) return null
+        return Bounds(minX, minY, maxX + 1, maxY + 1)
+    }
+
+    private fun tryPushLocal(
+        px: IntArray, seen: BooleanArray, stack: IntArray, sp: Int,
+        idx: Int, base: Int, tol: Int, sx: Int, sy: Int,
+        maxRadius: Int, w: Int
+    ): Int {
+        if (idx !in 0 until px.size) return sp
+        if (seen[idx]) return sp
+        val x = idx % w; val y = idx / w
+        val dx = x - sx; val dy = y - sy
+        if (dx * dx + dy * dy > maxRadius * maxRadius) return sp
+        if (kotlin.math.abs(lum(px[idx]) - base) > tol) return sp
+        seen[idx] = true
+        stack[sp] = idx
+        return sp + 1
+    }
 
     /**
      * Cresce região a partir de (sx,sy) sobre pixels com |brilho - brilho0| <= tol.

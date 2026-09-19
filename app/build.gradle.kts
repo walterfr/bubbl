@@ -40,6 +40,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.opencv:opencv:4.10.0")
 
     // Pan/zoom + tiling de imagens grandes de mangá
     implementation("com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0")

@@ -43,4 +43,25 @@ class BalloonDetectorTest {
         val px = IntArray(w * h) { WHITE }
         assertNull(BalloonDetector.floodFillBounds(px, w, h, 15, 15, 45, 0.5f))
     }
+
+    /** Região local de balão deve ser aceita mesmo quando a imagem inteira é muito maior. */
+    @Test fun localBalloonBoundsFindsRectAroundTouch() {
+        val w = 80; val h = 80
+        val px = IntArray(w * h) { BLACK }
+        for (y in 24..54) for (x in 22..58) px[y * w + x] = WHITE
+
+        val box = BalloonDetector.localBalloonBounds(px, w, h, 40, 40, 45, 0.35f, 0.4f)
+        assertNotNull(box)
+        assertEquals(22, box!!.left)
+        assertEquals(24, box.top)
+        assertEquals(59, box.right)
+        assertEquals(55, box.bottom)
+    }
+
+    /** Fundo uniforme não pode vazar por se destacar como balão no raio local. */
+    @Test fun localBalloonBoundsRejectsUniformBackground() {
+        val w = 80; val h = 80
+        val px = IntArray(w * h) { WHITE }
+        assertNull(BalloonDetector.localBalloonBounds(px, w, h, 40, 40, 45, 0.35f, 0.4f))
+    }
 }

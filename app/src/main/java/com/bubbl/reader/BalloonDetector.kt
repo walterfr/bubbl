@@ -14,6 +14,7 @@ import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint
+import org.opencv.core.Point
 import org.opencv.core.Rect as OpenCvRect
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
@@ -153,12 +154,16 @@ object BalloonDetector {
                 val fillRatio = if (area > 0) contourArea / area.toDouble() else 0.0
                 if (fillRatio < 0.12 || fillRatio > 0.95) continue
 
-                val touchX = sx.coerceIn(box.x, box.x + box.width)
-                val touchY = sy.coerceIn(box.y, box.y + box.height)
+                val polygon = contour.toArray()
+                if (!pointInsidePolygon(polygon, sx.toDouble(), sy.toDouble())) continue
+
                 val centerX = box.x + box.width / 2.0
                 val centerY = box.y + box.height / 2.0
-                val distance = kotlin.math.hypot((touchX - centerX).toDouble(), (touchY - centerY).toDouble())
-                val localRadius = maxOf(24.0, minOf(width.toDouble(), height.toDouble()) * 0.35)
+                val distance = kotlin.math.hypot(sx - centerX, sy - centerY)
+                val localRadius = maxOf(
+                    24.0,
+                    minOf(width.toDouble(), height.toDouble()) * LOCAL_SEARCH_RADIUS_FACTOR
+                )
                 if (distance > localRadius) continue
 
                 val score = (fillRatio.toFloat() * 4.0f) - ((distance / localRadius).toFloat() * 1.5f)
@@ -247,7 +252,10 @@ object BalloonDetector {
 
         val base = lum(px[sy * w + sx])
         val n = w * h
-        val maxRadius = maxOf(32, minOf(w, h) / 2).coerceAtMost(minOf(w, h))
+        val maxRadius = maxOf(
+            32,
+            (minOf(w, h) * LOCAL_SEARCH_RADIUS_FACTOR).toInt()
+        ).coerceAtMost(minOf(w, h))
         val seen = BooleanArray(n)
         val stack = IntArray(n)
         var sp = 0
@@ -286,6 +294,36 @@ object BalloonDetector {
         if (count < minFillRatio * bw * bh) return null
         if ((bw * bh).toFloat() > w * h * LOCAL_SEARCH_MAX_RATIO) return null
         return Bounds(minX, minY, maxX + 1, maxY + 1)
+    }
+
+    internal fun pointInsidePolygon(
+        points: Array<Point>,
+        x: Double,
+        y: Double
+    ): Boolean {
+        if (points.size < 3) return false
+
+        var inside = false
+        var previous = points.last()
+        for (current in points) {
+            val cross = (x - previous.x) * (current.y - previous.y) -
+                (y - previous.y) * (current.x - previous.x)
+            if (kotlin.math.abs(cross) < 1e-9 &&
+                x >= minOf(previous.x, current.x) && x <= maxOf(previous.x, current.x) &&
+                y >= minOf(previous.y, current.y) && y <= maxOf(previous.y, current.y)
+            ) {
+                return true
+            }
+
+            if ((current.y > y) != (previous.y > y)) {
+                val intersectionX =
+                    (previous.x - current.x) * (y - current.y) /
+                        (previous.y - current.y) + current.x
+                if (x < intersectionX) inside = !inside
+            }
+            previous = current
+        }
+        return inside
     }
 
     private fun tryPushLocal(

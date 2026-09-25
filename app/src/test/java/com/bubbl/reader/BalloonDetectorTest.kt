@@ -1,5 +1,6 @@
 package com.bubbl.reader
 
+import org.opencv.core.Point
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -91,5 +92,27 @@ class BalloonDetectorTest {
         val mask = BalloonDetector.regionMask(px, w, h, 15, 15, 45, box)
         assertEquals(20 * 20, mask.count { it })
         assertFalse(mask[0])
+    }
+
+    @Test fun contourCandidateMustContainTouchNotJustBoundingBox() {
+        val triangle = arrayOf(
+            Point(0.0, 0.0),
+            Point(10.0, 0.0),
+            Point(0.0, 10.0)
+        )
+
+        assertTrue(BalloonDetector.pointInsidePolygon(triangle, 2.0, 2.0))
+        assertFalse(BalloonDetector.pointInsidePolygon(triangle, 8.0, 8.0))
+        assertTrue(BalloonDetector.pointInsidePolygon(triangle, 5.0, 0.0))
+    }
+
+    @Test fun contoursWithTooFewPointsCannotContainTouch() {
+        assertFalse(
+            BalloonDetector.pointInsidePolygon(
+                arrayOf(Point(0.0, 0.0), Point(10.0, 10.0)),
+                5.0,
+                5.0
+            )
+        )
     }
 }

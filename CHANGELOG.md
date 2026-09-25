@@ -35,6 +35,10 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 - Removido o repositório JitPack (dependências vêm do Maven Central/Google).
 
 ### Corrigido
+- OpenCV não escolhe mais contornos próximos cujo bbox apenas contém o toque;
+  o ponto precisa estar dentro do próprio contorno.
+- O raio da busca local agora usa `LOCAL_SEARCH_RADIUS_FACTOR`, evitando um
+  limite duplicado e não aplicado.
 - Balão ampliado aparecia **invisível** quando detectado pelo flood-fill local
   ou pelo OpenCV (a máscara da silhueta saía vazia). A silhueta agora é
   calculada dentro do bbox, qualquer que seja o detector; teste de regressão.

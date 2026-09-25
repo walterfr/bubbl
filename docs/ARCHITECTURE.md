@@ -57,8 +57,9 @@ Toque numa página em `ReaderActivity`:
    1. **flood-fill local** — cresce a região de brilho parecido num raio em
       torno do toque; rejeita se vazar (fração/área de preenchimento);
    2. **contornos OpenCV** — limiar adaptativo + fechamento morfológico +
-      `findContours`, escolhe o contorno mais cheio e próximo do toque. Se a lib
-      nativa não carregar, este passo é pulado;
+      `findContours`, considera apenas contornos que contêm o ponto tocado e
+      escolhe o mais cheio/próximo. Se a lib nativa não carregar, este passo é
+      pulado;
    3. **flood-fill global** — sem limite de raio.
 
    A silhueta sai de um flood-fill **restrito ao bbox** encontrado

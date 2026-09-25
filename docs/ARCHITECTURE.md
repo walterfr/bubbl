@@ -84,8 +84,9 @@ Toque numa página em `ReaderActivity`:
 - **Detecção de balão é heurística.** Flood-fill + contornos OpenCV isolam
   balão de interior uniforme; casos difíceis não detectam (use o toque duplo).
   Robustez real = modelo ML.
-- **OpenCV pesa no APK** (libs nativas de todos os ABIs). Vale `abiFilters` ou
-  split por ABI antes de publicar.
+- **OpenCV pesa no APK.** O release filtra para `arm64-v8a`/`armeabi-v7a`; o
+  debug leva todos os ABIs (emulador x86_64). Em ABI sem lib, a detecção segue
+  sem o passo OpenCV.
 - **Extração antecipada.** O livro inteiro é extraído pro `cacheDir` ao abrir —
   simples e robusto, mas usa disco e demora em livros grandes. Trocar por carga
   sob demanda por página se virar gargalo.

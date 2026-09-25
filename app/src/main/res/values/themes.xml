@@ -14,8 +14,6 @@
         <item name="colorSurfaceVariant">@color/surface_variant</item>
         <item name="colorOnSurface">@color/on_surface</item>
         <item name="colorOnSurfaceVariant">@color/on_surface_muted</item>
-        <item name="android:statusBarColor">@color/ink</item>
-        <item name="android:navigationBarColor">@color/ink</item>
     </style>
 
     <style name="Theme.Bubbl.Fullscreen" parent="Theme.Bubbl">

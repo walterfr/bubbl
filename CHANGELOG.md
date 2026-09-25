@@ -23,7 +23,16 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   para ícones temáticos do Android 13+).
 - **Tela Sobre** com versão, links (GitHub, Instagram, contato) e apoio ao
   projeto: GitHub Sponsors, Ko-fi, Buy Me a Coffee e PIX copia-e-cola.
-- CI (GitHub Actions): `assembleDebug` + `test`.
+- CI (GitHub Actions): `test` + `lintDebug` + `assembleDebug`, com relatório
+  de lint como artefato.
+
+### Alterado
+- `compileSdk`/`targetSdk` 36, AGP 8.10, Kotlin 2.1, Gradle 8.11 e
+  dependências AndroidX atualizadas.
+- Telas em **edge-to-edge** (obrigatório no targetSdk 35+), respeitando barras
+  do sistema e recorte da câmera.
+- Release só com libs nativas ARM (`abiFilters`), reduzindo o APK.
+- Removido o repositório JitPack (dependências vêm do Maven Central/Google).
 
 ### Corrigido
 - Balão ampliado aparecia **invisível** quando detectado pelo flood-fill local

@@ -4,8 +4,8 @@ Obrigado pelo interesse! Este guia é curto de propósito.
 
 ## Ambiente
 
-- **JDK 17**, Android SDK com platform **android-34**.
-- Android Studio Hedgehog+ (recomendado) ou só o Gradle wrapper.
+- **JDK 17**, Android SDK com platform **android-36**.
+- Android Studio Meerkat+ (recomendado) ou só o Gradle wrapper.
 
 ```bash
 git clone https://github.com/walterfr/bubbl.git
@@ -20,7 +20,8 @@ cd bubbl
 2. Branch a partir de `main`: `git checkout -b feat/minha-coisa`.
 3. Commits no estilo [Conventional Commits](https://www.conventionalcommits.org/):
    `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `test:`.
-4. Rode `./gradlew test` antes de abrir o PR. A CI roda `assembleDebug` + `test`.
+4. Rode `./gradlew test lintDebug` antes de abrir o PR. A CI roda `test`,
+   `lintDebug` (erro de lint quebra o build) e `assembleDebug`.
 5. Abra o PR contra `main` descrevendo **o quê** e **por quê**.
 
 ## Estilo de código

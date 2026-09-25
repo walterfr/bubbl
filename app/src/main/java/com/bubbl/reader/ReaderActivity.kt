@@ -51,6 +51,10 @@ class ReaderActivity : AppCompatActivity() {
         val slider = findViewById<Slider>(R.id.pageSlider)
         overlay = findViewById(R.id.balloonOverlay)
         balloonImage = findViewById(R.id.balloonImage)
+        // barras escondidas, mas o recorte da câmera ainda pode cobrir o chrome
+        val cutout = WindowInsetsCompat.Type.displayCutout()
+        findViewById<View>(R.id.chromeTop).padForInsets(cutout, bottom = false)
+        findViewById<View>(R.id.chromeBottom).padForInsets(cutout, top = false)
         overlay.setOnClickListener { hideBalloon() }
 
         findViewById<TextView>(R.id.title).text = BookHolder.title

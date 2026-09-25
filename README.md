@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/walterfr/bubbl/actions/workflows/android.yml/badge.svg)](https://github.com/walterfr/bubbl/actions/workflows/android.yml)
 ![minSdk](https://img.shields.io/badge/minSdk-26-blue)
-![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 <img src="docs/img/home.png" width="640" alt="Tela inicial do Bubbl."/>
@@ -53,7 +53,7 @@ Tudo é convertido numa **lista única de páginas** (`Uri`), então o visualiza
 
 ## Build & Run
 
-Requisitos: **JDK 17**, Android SDK (platform 34), um dispositivo/emulador **Android 8.0+ (API 26)**.
+Requisitos: **JDK 17**, Android SDK (platform 36), um dispositivo/emulador **Android 8.0+ (API 26)**.
 
 ```bash
 git clone https://github.com/walterfr/bubbl.git
@@ -73,7 +73,7 @@ Rodar os testes:
 ./gradlew test
 ```
 
-> No Windows, use `gradlew.bat`. Ou abra a pasta no **Android Studio** (Hedgehog+) e rode a config `app`.
+> No Windows, use `gradlew.bat`. Ou abra a pasta no **Android Studio** (Meerkat+) e rode a config `app`.
 
 ## Stack
 

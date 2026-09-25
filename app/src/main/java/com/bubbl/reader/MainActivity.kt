@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -27,8 +28,10 @@ class MainActivity : AppCompatActivity() {
     ) { uri -> uri?.let { open(it, folder = true) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        findViewById<View>(R.id.root).padForInsets()
         progress = findViewById(R.id.progress)
 
         findViewById<Button>(R.id.btnOpenFile).setOnClickListener {

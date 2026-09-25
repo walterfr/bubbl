@@ -53,9 +53,17 @@ Toque numa página em `ReaderActivity`:
 
 1. `viewToSourceCoord` converte o toque em coordenada da imagem.
 2. [`BalloonDetector`](../app/src/main/java/com/bubbl/reader/BalloonDetector.kt)
-   cresce uma região (flood-fill) a partir do ponto sobre pixels de brilho
-   parecido até o contorno do balão, e devolve o bounding box. Rejeita quando
-   vaza (fração/raio de preenchimento) — aí não era balão.
+   acha o bounding box do balão em cascata, parando no primeiro que acertar:
+   1. **flood-fill local** — cresce a região de brilho parecido num raio em
+      torno do toque; rejeita se vazar (fração/área de preenchimento);
+   2. **contornos OpenCV** — limiar adaptativo + fechamento morfológico +
+      `findContours`, escolhe o contorno mais cheio e próximo do toque. Se a lib
+      nativa não carregar, este passo é pulado;
+   3. **flood-fill global** — sem limite de raio.
+
+   A silhueta sai de um flood-fill **restrito ao bbox** encontrado
+   (`regionMask`); se ficar esparsa (toque no texto, contorno do OpenCV), usa o
+   bbox inteiro — a máscara nunca sai vazia.
 3. Achou o balão: recorta nítido com `BitmapRegionDecoder` e **mascara no formato
    da silhueta** (máscara alpha da região dilatada, via `PorterDuff.DST_IN`),
    posiciona o recorte **sobre onde o balão está** (`sourceToViewCoord`) e
@@ -67,14 +75,17 @@ Toque numa página em `ReaderActivity`:
 (`SubsamplingScaleImageView`) — separados de propósito, pra não confundir. O
 `OnTouchListener` retorna `false`, então o SSIV ainda processa pan/pinça/duplo-toque.
 
-> A detecção é heurística (flood-fill), boa em balão de interior uniforme com
-> contorno fechado. Balão colorido/aberto/invertido pode não isolar → fallback.
-> Upgrade: OpenCV (morfologia) ou modelo ML de detecção de balão.
+> A detecção é heurística (flood-fill + contornos OpenCV), boa em balão de
+> interior uniforme com contorno fechado. Balão colorido/aberto/invertido pode
+> não isolar → o toque não faz nada. Upgrade: modelo ML de detecção de balão.
 
 ## Limitações conhecidas
 
-- **Detecção de balão é heurística.** Flood-fill isola balão de interior
-  uniforme; casos difíceis caem no zoom no ponto. Robustez real = OpenCV/ML.
+- **Detecção de balão é heurística.** Flood-fill + contornos OpenCV isolam
+  balão de interior uniforme; casos difíceis não detectam (use o toque duplo).
+  Robustez real = modelo ML.
+- **OpenCV pesa no APK** (libs nativas de todos os ABIs). Vale `abiFilters` ou
+  split por ABI antes de publicar.
 - **Extração antecipada.** O livro inteiro é extraído pro `cacheDir` ao abrir —
   simples e robusto, mas usa disco e demora em livros grandes. Trocar por carga
   sob demanda por página se virar gargalo.
@@ -91,4 +102,6 @@ Toque numa página em `ReaderActivity`:
   terceiros); um rewrite em Compose não se paga. Material 3 via
   Material Components já entrega o visual atual.
 - **`PdfRenderer` nativo** em vez de lib de PDF — zero dependência.
+- **OpenCV como reforço, não requisito.** Só entra como 2º passo da detecção;
+  se a lib nativa falhar ao carregar, o app segue só com flood-fill.
 - **`minSdk` 26** para usar ícone adaptativo 100% vetorial (sem gerar PNGs).

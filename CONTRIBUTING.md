@@ -33,6 +33,7 @@ cd bubbl
 ## Onde mexer
 
 - **Formatos / carregamento:** [`PageLoader.kt`](app/src/main/java/com/bubbl/reader/PageLoader.kt)
+- **Detecção de balão:** [`BalloonDetector.kt`](app/src/main/java/com/bubbl/reader/BalloonDetector.kt)
 - **Zoom / gestos / reader:** [`ReaderActivity.kt`](app/src/main/java/com/bubbl/reader/ReaderActivity.kt)
 - **Home / abertura:** [`MainActivity.kt`](app/src/main/java/com/bubbl/reader/MainActivity.kt)
 

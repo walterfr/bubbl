@@ -79,13 +79,15 @@ Rodar os testes:
 
 - **Kotlin** · Android Views · Material 3
 - [SubsamplingScaleImageView](https://github.com/davemorrissey/subsampling-scale-image-view) — pan/zoom + tiling
+- [OpenCV](https://opencv.org/) — contornos na detecção de balão
 - ViewPager2 · Coroutines · DocumentFile
 - `PdfRenderer` (nativo) · junrar (CBR)
 
 ## Roadmap
 
 - [x] Zoom no balão: **toque único** isola o balão (flood-fill) e infla ~2x no seu formato; **toque duplo** dá o zoom normal do documento.
-- [ ] Detecção robusta de balão (OpenCV ou modelo ML) para os casos que a heurística erra.
+- [x] Detecção em cascata: flood-fill local → contornos OpenCV → flood-fill global.
+- [ ] Detecção robusta de balão (modelo ML) para os casos que a heurística erra.
 - [ ] Direção de leitura direita→esquerda (mangá).
 - [ ] Biblioteca / histórico / marcadores / continuar de onde parou.
 - [ ] Carga de páginas sob demanda (hoje extrai o livro inteiro pro cache ao abrir).

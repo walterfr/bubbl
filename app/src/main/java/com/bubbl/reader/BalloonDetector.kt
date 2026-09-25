@@ -19,13 +19,15 @@ import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 
 /**
- * Detecta o balão sob o ponto tocado por crescimento de região (flood fill):
- * a partir do toque, cresce a área de pixels com brilho parecido até bater no
- * contorno do balão. Devolve o bounding box em coordenadas da imagem original.
+ * Detecta o balão sob o ponto tocado, em cascata:
+ * 1. flood fill local (raio limitado em torno do toque);
+ * 2. contornos via OpenCV (limiar adaptativo + morfologia);
+ * 3. flood fill global.
+ * A silhueta (máscara) sai de um flood fill restrito ao bbox encontrado.
  *
  * ponytail: heurística p/ balão de interior uniforme com contorno fechado
  * (mangá P&B típico). Balão colorido/aberto/invertido pode falhar -> null,
- * e o chamador cai no zoom no ponto. Upgrade: modelo ML de detecção de balão.
+ * e o toque único não faz nada. Upgrade: modelo ML de detecção de balão.
  */
 object BalloonDetector {
 
@@ -36,6 +38,7 @@ object BalloonDetector {
     private const val LOCAL_SEARCH_MAX_RATIO = 0.45f // área local máxima para um balão válido
     private const val LOCAL_SEARCH_RADIUS_FACTOR = 0.5f // raio local em torno do toque
 
+    private const val MASK_MIN_FILL = 0.20f // abaixo disso a silhueta é o bbox inteiro
     private const val DILATE = 3  // px (escala reduzida) p/ englobar o contorno do balão
 
     /** Bounding box puro (sem android.graphics, p/ ser testável em JVM). */
@@ -63,11 +66,12 @@ object BalloonDetector {
             var sy = (srcY / srcH * h).toInt().coerceIn(0, h - 1)
             adjustSeed(px, w, h, sx, sy)?.let { sx = it % w; sy = it / w }
 
-            val seen = BooleanArray(w * h)
             val box = localBalloonBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO)
                 ?: contourBounds(small, sx, sy)
-                ?: floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO, seen)
+                ?: floodFillBounds(px, w, h, sx, sy, TOL, MAX_FILL_FRAC, MIN_FILL_RATIO)
                 ?: return null
+            // silhueta do balão dentro do bbox, qualquer que seja o detector que achou
+            val seen = regionMask(px, w, h, sx, sy, TOL, box)
 
             // expande o bbox p/ dar espaço ao contorno (dilatação)
             val ex0 = (box.left - DILATE).coerceAtLeast(0)
@@ -110,6 +114,8 @@ object BalloonDetector {
         val gray = Mat()
         val blurred = Mat()
         val threshold = Mat()
+        val hierarchy = Mat()
+        val contours = ArrayList<MatOfPoint>()
         val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(5.0, 5.0))
 
         try {
@@ -125,8 +131,6 @@ object BalloonDetector {
             )
             Imgproc.morphologyEx(threshold, threshold, Imgproc.MORPH_CLOSE, kernel)
 
-            val contours = ArrayList<MatOfPoint>()
-            val hierarchy = Mat()
             Imgproc.findContours(
                 threshold,
                 contours,
@@ -165,23 +169,25 @@ object BalloonDetector {
             }
 
             return best
+        } catch (_: Throwable) {
+            return null  // falha nativa do OpenCV: segue para o flood fill
         } finally {
             rgba.release()
             gray.release()
             blurred.release()
             threshold.release()
+            hierarchy.release()
+            kernel.release()
+            contours.forEach { it.release() }
         }
     }
 
-    private fun ensureOpenCvLoaded(): Boolean {
-        return try {
-            OpenCVLoader.initDebug(); true
-        } catch (_: UnsatisfiedLinkError) {
-            false
-        } catch (_: RuntimeException) {
-            false
-        }
+    /** Carrega o OpenCV uma vez; false se a lib nativa não carregar (sem crash). */
+    private val openCvLoaded: Boolean by lazy {
+        try { OpenCVLoader.initDebug() } catch (_: Throwable) { false }
     }
+
+    private fun ensureOpenCvLoaded(): Boolean = openCvLoaded
 
     private fun dilatedAt(seen: BooleanArray, w: Int, h: Int, gx: Int, gy: Int, r: Int): Boolean {
         var dy = -r
@@ -299,19 +305,53 @@ object BalloonDetector {
     }
 
     /**
+     * Silhueta do balão: flood fill a partir do toque, restrito ao bbox detectado.
+     * Se a região ficar esparsa (ex.: toque em texto/contorno achado pelo OpenCV),
+     * cai no bbox inteiro — nunca devolve máscara vazia.
+     */
+    fun regionMask(
+        px: IntArray, w: Int, h: Int, sx: Int, sy: Int, tol: Int, box: Bounds
+    ): BooleanArray {
+        val seen = BooleanArray(w * h)
+        val x0 = box.left.coerceIn(0, w); val x1 = box.right.coerceIn(0, w)
+        val y0 = box.top.coerceIn(0, h); val y1 = box.bottom.coerceIn(0, h)
+        var count = 0
+        if (sx in x0 until x1 && sy in y0 until y1) {
+            val base = lum(px[sy * w + sx])
+            val stack = IntArray(w * h)
+            var sp = 0
+            stack[sp++] = sy * w + sx
+            seen[sy * w + sx] = true
+            while (sp > 0) {
+                val idx = stack[--sp]
+                count++
+                val x = idx % w; val y = idx / w
+                if (x > x0)     sp = tryPush(px, seen, stack, sp, idx - 1, base, tol)
+                if (x < x1 - 1) sp = tryPush(px, seen, stack, sp, idx + 1, base, tol)
+                if (y > y0)     sp = tryPush(px, seen, stack, sp, idx - w, base, tol)
+                if (y < y1 - 1) sp = tryPush(px, seen, stack, sp, idx + w, base, tol)
+            }
+        }
+        val area = (x1 - x0) * (y1 - y0)
+        if (count < MASK_MIN_FILL * area) {
+            for (y in y0 until y1) for (x in x0 until x1) seen[y * w + x] = true
+        }
+        return seen
+    }
+
+    /**
      * Cresce região a partir de (sx,sy) sobre pixels com |brilho - brilho0| <= tol.
      * Devolve bounding box, ou null se a região vazou (> maxFrac da imagem) ou
      * encostou nas 4 bordas (fundo, não balão).
      */
     fun floodFillBounds(
         px: IntArray, w: Int, h: Int, sx: Int, sy: Int,
-        tol: Int, maxFrac: Float, minFillRatio: Float = 0f,
-        outSeen: BooleanArray? = null
+        tol: Int, maxFrac: Float, minFillRatio: Float = 0f
     ): Bounds? {
         val n = w * h
         if (sx !in 0 until w || sy !in 0 until h) return null
         val base = lum(px[sy * w + sx])
-        val seen = outSeen ?: BooleanArray(n)
+        val seen = BooleanArray(n)
         val stack = IntArray(n)
         var sp = 0
         stack[sp++] = sy * w + sx

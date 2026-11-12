@@ -52,6 +52,7 @@ class ReaderActivity : AppCompatActivity() {
     private lateinit var pager: ViewPager2
     private lateinit var label: TextView
     private lateinit var slider: Slider
+    private lateinit var btnDirection: ImageButton
     private lateinit var loading: View
     private lateinit var overlay: View
     private lateinit var balloonImage: ImageView
@@ -59,6 +60,7 @@ class ReaderActivity : AppCompatActivity() {
 
     private var key: String? = null
     private var pages: List<Uri> = emptyList()
+    private var rtl = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +70,7 @@ class ReaderActivity : AppCompatActivity() {
         pager = findViewById(R.id.pager)
         label = findViewById(R.id.pageLabel)
         slider = findViewById(R.id.pageSlider)
+        btnDirection = findViewById(R.id.btnDirection)
         loading = findViewById(R.id.loading)
         overlay = findViewById(R.id.balloonOverlay)
         balloonImage = findViewById(R.id.balloonImage)
@@ -129,6 +132,12 @@ class ReaderActivity : AppCompatActivity() {
         val entry = key?.let { ReadingStore.get(this, it) }
         setTitleText(BookHolder.title.ifEmpty { entry?.title.orEmpty() })
         val start = Recents.clampPage(entry?.page ?: 0, pages.size)
+        rtl = entry?.rtl ?: false
+        // direção antes do adapter: o ViewPager2 já nasce no sentido certo
+        pager.layoutDirection = if (rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        updateDirectionButton()
+        btnDirection.visibility = View.VISIBLE
+        btnDirection.setOnClickListener { toggleDirection() }
 
         pager.adapter = PageAdapter(pages) { view, uri, sx, sy -> onTap(view, uri, sx, sy) }
 
@@ -137,16 +146,16 @@ class ReaderActivity : AppCompatActivity() {
         } else {
             slider.valueFrom = 1f
             slider.valueTo = pages.size.toFloat()
-            slider.value = (start + 1).toFloat()
+            slider.value = PageSlider.valueFor(start, pages.size, rtl)
             slider.addOnChangeListener { _, value, fromUser ->
-                if (fromUser) pager.setCurrentItem(value.toInt() - 1, false)
+                if (fromUser) pager.setCurrentItem(PageSlider.indexFor(value, pages.size, rtl), false)
             }
         }
 
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 updateChrome(position)
-                savePage()
+                savePage(position)
             }
         })
         pager.setCurrentItem(start, false)
@@ -155,13 +164,37 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun updateChrome(position: Int) {
         label.text = getString(R.string.page_counter, position + 1, pages.size)
-        if (pages.size >= 2) slider.value = (position + 1).toFloat()
+        if (pages.size >= 2) slider.value = PageSlider.valueFor(position, pages.size, rtl)
     }
 
-    private fun savePage() {
+    /** Alterna LTR/RTL (mangá), persistido por livro; mantém a página atual. */
+    private fun toggleDirection() {
+        rtl = !rtl
+        key?.let { ReadingStore.setRtl(this, it, rtl) }
+        val current = pager.currentItem
+        pager.layoutDirection = if (rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        // força o RecyclerView interno a refazer o layout no novo sentido, na mesma página
+        (pager.getChildAt(0) as? RecyclerView)?.scrollToPosition(current)
+        updateChrome(current)
+        updateDirectionButton()
+        Toast.makeText(
+            this,
+            if (rtl) R.string.direction_changed_rtl else R.string.direction_changed_ltr,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun updateDirectionButton() {
+        // o ícone aponta para a direita; em RTL é espelhado
+        btnDirection.scaleX = if (rtl) -1f else 1f
+        btnDirection.contentDescription =
+            getString(if (rtl) R.string.direction_rtl else R.string.direction_ltr)
+    }
+
+    private fun savePage(position: Int = pager.currentItem) {
         val k = key ?: return
         if (pages.isEmpty()) return
-        ReadingStore.savePage(this, k, pager.currentItem)
+        ReadingStore.savePage(this, k, position)
     }
 
     private fun setTitleText(t: String) {

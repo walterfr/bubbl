@@ -22,5 +22,9 @@
 
     <!-- Leitor -->
     <string name="page_counter">%1$d / %2$d</string>
+    <string name="direction_ltr">Leitura da esquerda para a direita. Tocar para inverter</string>
+    <string name="direction_rtl">Leitura da direita para a esquerda (mangá). Tocar para inverter</string>
+    <string name="direction_changed_ltr">Leitura: esquerda → direita</string>
+    <string name="direction_changed_rtl">Leitura: direita → esquerda (mangá)</string>
     <string name="reopen_failed">Não foi possível reabrir o livro</string>
 </resources>

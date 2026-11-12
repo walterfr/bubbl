@@ -47,6 +47,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun open(uri: Uri, folder: Boolean) {
+        // mantém o acesso após reiniciar p/ reabrir dos recentes
+        ReadingStore.takePermission(this, uri)
         progress.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -61,6 +63,7 @@ class MainActivity : AppCompatActivity() {
                     toast("Nenhuma página encontrada")
                 } else {
                     BookHolder.pages = pages
+                    ReadingStore.opened(this@MainActivity, uri.toString(), folder, BookHolder.title, pages.size)
                     startActivity(Intent(this@MainActivity, ReaderActivity::class.java))
                 }
             }.onFailure { toast(it.message ?: "Falha ao abrir") }

@@ -63,8 +63,9 @@ class MainActivity : AppCompatActivity() {
                     toast("Nenhuma página encontrada")
                 } else {
                     BookHolder.pages = pages
+                    BookHolder.source = uri.toString()
                     ReadingStore.opened(this@MainActivity, uri.toString(), folder, BookHolder.title, pages.size)
-                    startActivity(Intent(this@MainActivity, ReaderActivity::class.java))
+                    startActivity(ReaderActivity.intent(this@MainActivity, uri, folder))
                 }
             }.onFailure { toast(it.message ?: "Falha ao abrir") }
         }

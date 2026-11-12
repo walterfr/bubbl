@@ -19,12 +19,21 @@
 
 Bubbl. abre arquivos de quadrinho/mangá e deixa a leitura fluida numa ideia central: **um toque na página dá zoom automático ancorado no ponto tocado** — o balão de diálogo que você quer ler. Toca de novo, volta pro enquadramento da página. Sem menus, sem pinça.
 
+## Instalação
+
+1. Baixe o `bubbl-vX.Y.Z.apk` mais recente na página [Releases](https://github.com/walterfr/bubbl/releases) do GitHub.
+2. Abra o APK no celular. Na primeira vez o Android pede para **permitir a instalação de fontes desconhecidas** para o app que abriu o arquivo (navegador ou gerenciador de arquivos) — permita e confirme a instalação.
+3. Requer **Android 8.0+ (API 26)**.
+
+Depois de instalado, o Bubbl. aparece no **"Abrir com…"** de gerenciadores de arquivos e outros apps para CBZ, CBR, PDF e EPUB.
+
 ## Recursos
 
 - **Zoom no toque** ancorado no ponto (o balão), com animação suave.
 - **Tiling de imagens grandes** — páginas de mangá em alta resolução sem estourar memória.
 - **Leitura imersiva** — barras de sistema escondidas, chrome translúcido (voltar, contador, slider de página).
 - **Vários formatos** num pipeline único.
+- **"Abrir com…"** — abre quadrinhos e PDFs direto do gerenciador de arquivos, Drive etc.
 - **Material 3** (tema escuro), ícone adaptativo vetorial.
 
 ## Formatos suportados

@@ -9,3 +9,6 @@
 .externalNativeBuild
 .cxx/
 .codegraph/
+# keystores de assinatura nunca vao pro repo
+*.jks
+*.keystore

@@ -21,7 +21,7 @@ MainActivity ──escolhe arquivo/pasta──▶ PageLoader ──List<Uri>─�
 
 | Arquivo | Papel |
 |---|---|
-| [`MainActivity.kt`](../app/src/main/java/com/bubbl/reader/MainActivity.kt) | Home. Abre arquivo (SAF `OpenDocument`) ou pasta (`OpenDocumentTree`). Carrega em `Dispatchers.IO`. |
+| [`MainActivity.kt`](../app/src/main/java/com/bubbl/reader/MainActivity.kt) | Home. Abre arquivo (SAF `OpenDocument`), pasta (`OpenDocumentTree`) ou o que chega por "Abrir com…" (`ACTION_VIEW`). Carrega em `Dispatchers.IO`. |
 | [`PageLoader.kt`](../app/src/main/java/com/bubbl/reader/PageLoader.kt) | Converte qualquer entrada numa lista ordenada de `Uri` de página. |
 | [`BookHolder.kt`](../app/src/main/java/com/bubbl/reader/BookHolder.kt) | Singleton que passa as páginas entre Activities sem estourar o tamanho do Intent. |
 | [`ReaderActivity.kt`](../app/src/main/java/com/bubbl/reader/ReaderActivity.kt) | ViewPager2 de páginas, modo imersivo, chrome (voltar/slider) e o gesto de zoom. |

@@ -25,6 +25,12 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   projeto: GitHub Sponsors, Ko-fi, Buy Me a Coffee e PIX copia-e-cola.
 - CI (GitHub Actions): `test` + `lintDebug` + `assembleDebug`, com relatório
   de lint como artefato.
+- **"Abrir com…"**: o Bubbl. aparece para CBZ, CBR, PDF e EPUB vindos de
+  gerenciadores de arquivos e outros apps (`ACTION_VIEW`).
+- Formato deduzido pelo **MIME** quando o arquivo recebido não tem extensão.
+- **APK de release assinado**: workflow `release.yml` publica uma GitHub
+  Release com `bubbl-vX.Y.Z.apk` a cada tag `v*` (keystore via secrets).
+- Instruções de instalação (README) e de release (CONTRIBUTING).
 
 ### Alterado
 - `compileSdk`/`targetSdk` 36, AGP 8.10, Kotlin 2.1, Gradle 8.11 e
@@ -33,6 +39,9 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   do sistema e recorte da câmera.
 - Release só com libs nativas ARM (`abiFilters`), reduzindo o APK.
 - Removido o repositório JitPack (dependências vêm do Maven Central/Google).
+- Versão **0.2.0** (`versionCode` 2).
+- Release com **R8** (minify + shrink de recursos) e regras para OpenCV e
+  junrar; a CI agora também roda `assembleRelease` em todo PR.
 
 ### Corrigido
 - OpenCV não escolhe mais contornos próximos cujo bbox apenas contém o toque;

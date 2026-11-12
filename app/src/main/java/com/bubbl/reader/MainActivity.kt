@@ -99,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         ReadingStore.remove(this, e.key)
         refreshRecents()
         var undone = false
-        Snackbar.make(findViewById(R.id.root), getString(R.string.recent_removed, e.title), Snackbar.LENGTH_LONG)
+        Snackbar.make(findViewById<View>(R.id.root), getString(R.string.recent_removed, e.title), Snackbar.LENGTH_LONG)
             .setAction(R.string.undo) {
                 undone = true
                 ReadingStore.upsert(this, e)
@@ -140,6 +140,9 @@ class MainActivity : AppCompatActivity() {
         ReadingStore.takePermission(this, uri)
         val previous = loadJob
         previous?.cancel()
+        // o PageLoader apaga o cache do livro anterior: não deixa páginas órfãs no holder
+        BookHolder.pages = emptyList()
+        BookHolder.source = null
         showLoading(true)
         loadJob = lifecycleScope.launch {
             val job = coroutineContext[Job]

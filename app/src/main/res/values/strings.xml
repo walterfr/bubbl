@@ -28,6 +28,15 @@
     <string name="no_pages">Nenhuma página encontrada</string>
     <string name="open_failed">Falha ao abrir</string>
 
+    <!-- Home: continuar lendo -->
+    <string name="recent_header">Continuar lendo</string>
+    <string name="recent_progress">Página %1$d de %2$d</string>
+    <string name="recent_removed">“%1$s” removido da lista</string>
+    <string name="recent_unavailable">Não foi possível abrir. O arquivo pode ter sido movido ou apagado, ou o acesso expirou. Remover da lista?</string>
+    <string name="undo">Desfazer</string>
+    <string name="remove">Remover</string>
+    <string name="close">Fechar</string>
+
     <!-- Leitor -->
     <string name="page_counter">%1$d / %2$d</string>
     <string name="direction_ltr">Leitura da esquerda para a direita. Tocar para inverter</string>

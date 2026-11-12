@@ -3,14 +3,19 @@ package com.bubbl.reader
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +28,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var progressText: TextView
     private lateinit var btnOpenFile: Button
     private lateinit var btnOpenFolder: Button
+    private lateinit var recentSection: View
+    private lateinit var recentList: LinearLayout
     private var loadJob: Job? = null
 
     private val pickFile = registerForActivityResult(
@@ -42,6 +49,8 @@ class MainActivity : AppCompatActivity() {
         progressText = findViewById(R.id.progressText)
         btnOpenFile = findViewById(R.id.btnOpenFile)
         btnOpenFolder = findViewById(R.id.btnOpenFolder)
+        recentSection = findViewById(R.id.recentSection)
+        recentList = findViewById(R.id.recentList)
 
         btnOpenFile.setOnClickListener {
             // MIME amplo; muitos comics não têm MIME registrado, então */*
@@ -60,7 +69,73 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun open(uri: Uri, folder: Boolean) {
+    override fun onResume() {
+        super.onResume()
+        refreshRecents()
+    }
+
+    // ---- Continuar lendo ----
+
+    private fun refreshRecents() {
+        val items = ReadingStore.all(this)
+        recentList.removeAllViews()
+        recentSection.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        val inflater = LayoutInflater.from(this)
+        items.forEach { e ->
+            val v = inflater.inflate(R.layout.item_recent, recentList, false)
+            v.findViewById<ImageView>(R.id.recentIcon)
+                .setImageResource(if (e.folder) R.drawable.ic_folder else R.drawable.ic_file)
+            v.findViewById<TextView>(R.id.recentTitle).text = e.title
+            v.findViewById<TextView>(R.id.recentProgress).text =
+                getString(R.string.recent_progress, e.page + 1, e.total)
+            v.setOnClickListener { if (loadJob?.isActive != true) load(Uri.parse(e.key), e.folder, e) }
+            v.setOnLongClickListener { removeRecent(e); true }
+            recentList.addView(v)
+        }
+    }
+
+    /** Remove com "Desfazer"; só solta a permissão do Uri se não desfizer. */
+    private fun removeRecent(e: BookEntry) {
+        ReadingStore.remove(this, e.key)
+        refreshRecents()
+        var undone = false
+        Snackbar.make(findViewById(R.id.root), getString(R.string.recent_removed, e.title), Snackbar.LENGTH_LONG)
+            .setAction(R.string.undo) {
+                undone = true
+                ReadingStore.upsert(this, e)
+                refreshRecents()
+            }
+            .addCallback(object : Snackbar.Callback() {
+                override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+                    // reaberto nesse meio-tempo? então a permissão ainda é usada
+                    if (!undone && ReadingStore.get(this@MainActivity, e.key) == null) {
+                        ReadingStore.releasePermission(this@MainActivity, e.key)
+                    }
+                }
+            })
+            .show()
+    }
+
+    /** Recente que não abre mais (movido/apagado/permissão perdida): oferece remover. */
+    private fun recentFailed(e: BookEntry) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(e.title)
+            .setMessage(R.string.recent_unavailable)
+            .setPositiveButton(R.string.remove) { _, _ ->
+                ReadingStore.remove(this, e.key)
+                ReadingStore.releasePermission(this, e.key)
+                refreshRecents()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    // ---- abertura ----
+
+    private fun open(uri: Uri, folder: Boolean) = load(uri, folder, recent = null)
+
+    /** [recent] != null: aberto pela lista; falha vira o diálogo de remover. */
+    private fun load(uri: Uri, folder: Boolean, recent: BookEntry?) {
         // mantém o acesso após reiniciar p/ reabrir dos recentes
         ReadingStore.takePermission(this, uri)
         val previous = loadJob
@@ -91,7 +166,8 @@ class MainActivity : AppCompatActivity() {
             } catch (e: CancellationException) {
                 throw e // cancelado pelo usuário (ou Activity destruída): sem erro
             } catch (e: Throwable) {
-                toast(e.message ?: getString(R.string.open_failed))
+                if (recent != null) recentFailed(recent)
+                else toast(e.message ?: getString(R.string.open_failed))
             } finally {
                 if (loadJob === job) showLoading(false)
             }

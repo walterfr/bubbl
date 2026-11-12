@@ -56,7 +56,7 @@ object PageLoader {
         BookHolder.title = name.substringBeforeLast('.')
         val work = freshDir(ctx)
 
-        val ext = name.substringAfterLast('.', "").lowercase()
+        val ext = extensionOf(ctx, uri, name)
         return when {
             ext in IMAGE_EXT -> listOf(copyTo(ctx, uri, File(work, "0.$ext")))
             ext == "cbz" || ext == "zip" || ext == "epub" -> fromZip(ctx, uri, work)
@@ -163,6 +163,23 @@ object PageLoader {
             FileOutputStream(dest).use { ins.copyTo(it) }
         }
         return dest
+    }
+
+    /** Extensão pelo nome; sem extensão conhecida (comum no "Abrir com"), deduz pelo MIME. */
+    private fun extensionOf(ctx: Context, uri: Uri, name: String): String {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext in IMAGE_EXT || ext in setOf("cbz", "zip", "epub", "cbr", "rar", "pdf")) return ext
+        val mime = ctx.contentResolver.getType(uri)?.lowercase() ?: return ext
+        return when (mime) {
+            "application/vnd.comicbook+zip", "application/x-cbz" -> "cbz"
+            "application/vnd.comicbook-rar", "application/x-cbr",
+            "application/x-rar-compressed", "application/vnd.rar" -> "cbr"
+            "application/zip" -> "zip"
+            "application/epub+zip" -> "epub"
+            "application/pdf" -> "pdf"
+            "image/x-ms-bmp" -> "bmp"
+            else -> mime.removePrefix("image/").takeIf { mime.startsWith("image/") && it in IMAGE_EXT } ?: ext
+        }
     }
 
     private fun displayName(ctx: Context, uri: Uri): String {

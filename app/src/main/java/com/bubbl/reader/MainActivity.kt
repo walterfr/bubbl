@@ -44,6 +44,22 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.widget.ImageButton>(R.id.btnAbout).setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
+        if (savedInstanceState == null) handleViewIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleViewIntent(intent)
+    }
+
+    /** "Abrir com…": arquivo vindo de outro app via ACTION_VIEW. */
+    private fun handleViewIntent(intent: Intent?) {
+        if (intent == null || intent.action != Intent.ACTION_VIEW) return
+        // reaberto pelo histórico de recentes: não reabrir o mesmo arquivo
+        if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
+        val uri = intent.data ?: return
+        open(uri, folder = false)
     }
 
     private fun open(uri: Uri, folder: Boolean) {

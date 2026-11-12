@@ -5,6 +5,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Keystore de release vem de variáveis de ambiente (secrets na CI). Sem elas,
+// o assembleRelease continua funcionando e gera APK não assinado.
+val releaseKeystore: java.io.File? = System.getenv("BUBBL_KEYSTORE_PATH")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { file(it) }
+    ?.takeIf { it.isFile }
+
 android {
     namespace = "com.bubbl.reader"
     compileSdk = 36
@@ -13,12 +20,28 @@ android {
         applicationId = "com.bubbl.reader"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("BUBBL_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("BUBBL_KEY_ALIAS")
+                keyPassword = System.getenv("BUBBL_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
             // OpenCV traz libs nativas de todos os ABIs; no release só ARM (celulares).
             // O debug mantém todos p/ rodar em emulador x86_64.
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }

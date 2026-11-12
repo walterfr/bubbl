@@ -19,12 +19,25 @@
 
 Bubbl. abre arquivos de quadrinho/mangá e deixa a leitura fluida numa ideia central: **um toque na página dá zoom automático ancorado no ponto tocado** — o balão de diálogo que você quer ler. Toca de novo, volta pro enquadramento da página. Sem menus, sem pinça.
 
+## Instalação
+
+1. Baixe o `bubbl-vX.Y.Z.apk` mais recente na página [Releases](https://github.com/walterfr/bubbl/releases) do GitHub.
+2. Abra o APK no celular. Na primeira vez o Android pede para **permitir a instalação de fontes desconhecidas** para o app que abriu o arquivo (navegador ou gerenciador de arquivos) — permita e confirme a instalação.
+3. Requer **Android 8.0+ (API 26)**.
+
+Depois de instalado, o Bubbl. aparece no **"Abrir com…"** de gerenciadores de arquivos e outros apps para CBZ, CBR, PDF e EPUB.
+
 ## Recursos
 
 - **Zoom no toque** ancorado no ponto (o balão), com animação suave.
 - **Tiling de imagens grandes** — páginas de mangá em alta resolução sem estourar memória.
-- **Leitura imersiva** — barras de sistema escondidas, chrome translúcido (voltar, contador, slider de página).
+- **Leitura imersiva** — barras de sistema escondidas, chrome translúcido (voltar, direção, contador, slider de página).
+- **Continuar de onde parou** — cada livro guarda a última página; a Home lista até 10 recentes em "Continuar lendo".
+- **Direita→esquerda (mangá)** — alterna a direção de leitura por livro; o slider acompanha o sentido.
+- **Abertura com progresso** — "Abrindo… 12 / 80" e botão Cancelar.
+- **Sobrevive à morte do processo** — o leitor recarrega o livro sozinho ao voltar do segundo plano.
 - **Vários formatos** num pipeline único.
+- **"Abrir com…"** — abre quadrinhos e PDFs direto do gerenciador de arquivos, Drive etc.
 - **Material 3** (tema escuro), ícone adaptativo vetorial.
 
 ## Formatos suportados
@@ -40,16 +53,20 @@ Bubbl. abre arquivos de quadrinho/mangá e deixa a leitura fluida numa ideia cen
 
 Tudo é convertido numa **lista única de páginas** (`Uri`), então o visualizador trata todo formato igual. Detalhes em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Gestos
+## Gestos e controles
 
-| Gesto | Ação |
+| Gesto / controle | Ação |
 |---|---|
 | **Toque** | Amplia o balão sob o dedo (no formato dele) |
 | **Toque duplo** | Zoom normal do documento |
 | **Pinça** | Zoom livre |
 | **Arrastar** | Pan (quando com zoom) |
 | **Deslizar horizontal** | Trocar de página |
-| **Slider inferior** | Pular para qualquer página |
+| **Slider inferior** | Pular para qualquer página (invertido em direita→esquerda) |
+| **Botão de direção** (topo do leitor) | Alterna esquerda→direita / direita→esquerda (mangá), salvo por livro |
+| **Toque em "Continuar lendo"** (Home) | Reabre o livro na última página |
+| **Toque longo em "Continuar lendo"** | Remove da lista (com Desfazer) |
+| **Cancelar** (ao abrir) | Interrompe a extração do livro |
 
 ## Build & Run
 
@@ -88,8 +105,9 @@ Rodar os testes:
 - [x] Zoom no balão: **toque único** isola o balão (flood-fill) e infla ~2x no seu formato; **toque duplo** dá o zoom normal do documento.
 - [x] Detecção em cascata: flood-fill local → contornos OpenCV → flood-fill global.
 - [ ] Detecção robusta de balão (modelo ML) para os casos que a heurística erra.
-- [ ] Direção de leitura direita→esquerda (mangá).
-- [ ] Biblioteca / histórico / marcadores / continuar de onde parou.
+- [x] Direção de leitura direita→esquerda (mangá), por livro.
+- [x] Continuar de onde parou + histórico de recentes ("Continuar lendo").
+- [ ] Biblioteca completa / marcadores.
 - [ ] Carga de páginas sob demanda (hoje extrai o livro inteiro pro cache ao abrir).
 - [ ] EPUB baseado em texto (parse de OPF/spine + render HTML).
 

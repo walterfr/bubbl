@@ -12,11 +12,20 @@ import com.github.junrar.Archive
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+
+/** Progresso da carga: (páginas prontas, total ou nulo se desconhecido). */
+typealias LoadProgress = (done: Int, total: Int?) -> Unit
 
 /**
  * Converte qualquer entrada (arquivo comic ou pasta) numa lista ordenada de Uris de página.
  * Estratégia única: extrai/renderiza tudo para o cacheDir como imagens e devolve file:// Uris,
  * assim o SubsamplingScaleImageView faz tiling nativo em qualquer formato.
+ *
+ * As cargas são `suspend` e canceláveis (checam o Job a cada página). [LoadProgress] recebe
+ * páginas prontas e o total (nulo quando desconhecido, como no ZIP lido por stream);
+ * é chamado na thread de IO — quem atualiza UI deve repostar na main.
  */
 object PageLoader {
 
@@ -51,46 +60,54 @@ object PageLoader {
     }
 
     /** Chamada em thread de IO. Devolve páginas prontas. */
-    fun load(ctx: Context, uri: Uri): List<Uri> {
+    suspend fun load(ctx: Context, uri: Uri, onProgress: LoadProgress = { _, _ -> }): List<Uri> {
         val name = displayName(ctx, uri)
         BookHolder.title = name.substringBeforeLast('.')
         val work = freshDir(ctx)
 
-        val ext = name.substringAfterLast('.', "").lowercase()
+        val ext = extensionOf(ctx, uri, name)
         return when {
-            ext in IMAGE_EXT -> listOf(copyTo(ctx, uri, File(work, "0.$ext")))
-            ext == "cbz" || ext == "zip" || ext == "epub" -> fromZip(ctx, uri, work)
-            ext == "cbr" || ext == "rar" -> fromRar(ctx, uri, work)
-            ext == "pdf" -> fromPdf(ctx, uri, work)
+            ext in IMAGE_EXT -> listOf(copyTo(ctx, uri, File(work, "0.$ext"))).also { onProgress(1, 1) }
+            ext == "cbz" || ext == "zip" || ext == "epub" -> fromZip(ctx, uri, work, onProgress)
+            ext == "cbr" || ext == "rar" -> fromRar(ctx, uri, work, onProgress)
+            ext == "pdf" -> fromPdf(ctx, uri, work, onProgress)
             else -> throw UnsupportedFormat("Formato não suportado: .$ext")
         }
     }
 
     /** Pasta escolhida via ACTION_OPEN_DOCUMENT_TREE. */
-    fun loadFolder(ctx: Context, treeUri: Uri): List<Uri> {
+    suspend fun loadFolder(ctx: Context, treeUri: Uri, onProgress: LoadProgress = { _, _ -> }): List<Uri> {
         val dir = DocumentFile.fromTreeUri(ctx, treeUri)
             ?: throw UnsupportedFormat("Pasta inválida")
         BookHolder.title = dir.name ?: "Pasta"
-        return dir.listFiles()
-            .filter { it.isFile && (it.name ?: "").substringAfterLast('.', "").lowercase() in IMAGE_EXT }
-            .sortedWith(compareBy(naturalOrder) { it.name ?: "" })
-            .map { it.uri }
+        val files = dir.listFiles()
+        // cada name/isFile é uma consulta ao provider: progresso e cancelamento por item
+        val images = mutableListOf<Pair<String, Uri>>()
+        files.forEachIndexed { i, f ->
+            currentCoroutineContext().ensureActive()
+            val name = f.name ?: ""
+            if (f.isFile && name.substringAfterLast('.', "").lowercase() in IMAGE_EXT) images.add(name to f.uri)
+            onProgress(i + 1, files.size)
+        }
+        return images.sortedWith(compareBy(naturalOrder) { it.first }).map { it.second }
     }
 
     // ---- formatos ----
 
-    private fun fromZip(ctx: Context, uri: Uri, work: File): List<Uri> {
+    private suspend fun fromZip(ctx: Context, uri: Uri, work: File, onProgress: LoadProgress): List<Uri> {
         val out = mutableListOf<Pair<String, File>>()
         ctx.contentResolver.openInputStream(uri)!!.use { ins ->
             ZipInputStream(ins).use { zip ->
                 var e = zip.nextEntry
                 var idx = 0
                 while (e != null) {
+                    currentCoroutineContext().ensureActive()
                     val entryName = e.name
                     if (!e.isDirectory && entryName.substringAfterLast('.', "").lowercase() in IMAGE_EXT) {
                         val f = File(work, "%05d_%s".format(idx++, entryName.substringAfterLast('/')))
                         FileOutputStream(f).use { zip.copyTo(it) }
                         out.add(entryName to f)
+                        onProgress(out.size, null) // stream: total desconhecido
                     }
                     zip.closeEntry()
                     e = zip.nextEntry
@@ -101,18 +118,21 @@ object PageLoader {
         return out.sortedWith(compareBy(naturalOrder) { it.first }).map { Uri.fromFile(it.second) }
     }
 
-    private fun fromRar(ctx: Context, uri: Uri, work: File): List<Uri> {
+    private suspend fun fromRar(ctx: Context, uri: Uri, work: File, onProgress: LoadProgress): List<Uri> {
         val tmp = copyToFile(ctx, uri, File(work, "_in.rar"))
         val out = mutableListOf<Pair<String, File>>()
         Archive(tmp).use { arc ->
-            var idx = 0
-            for (h in arc.fileHeaders) {
-                if (h.isDirectory) continue
+            val images = arc.fileHeaders.filter { h ->
+                !h.isDirectory &&
+                    h.fileName.replace('\\', '/').substringAfterLast('.', "").lowercase() in IMAGE_EXT
+            }
+            images.forEachIndexed { idx, h ->
+                currentCoroutineContext().ensureActive()
                 val hn = h.fileName.replace('\\', '/')
-                if (hn.substringAfterLast('.', "").lowercase() !in IMAGE_EXT) continue
-                val f = File(work, "%05d_%s".format(idx++, hn.substringAfterLast('/')))
+                val f = File(work, "%05d_%s".format(idx, hn.substringAfterLast('/')))
                 FileOutputStream(f).use { arc.extractFile(h, it) }
                 out.add(hn to f)
+                onProgress(out.size, images.size)
             }
         }
         tmp.delete()
@@ -120,12 +140,13 @@ object PageLoader {
         return out.sortedWith(compareBy(naturalOrder) { it.first }).map { Uri.fromFile(it.second) }
     }
 
-    private fun fromPdf(ctx: Context, uri: Uri, work: File): List<Uri> {
+    private suspend fun fromPdf(ctx: Context, uri: Uri, work: File, onProgress: LoadProgress): List<Uri> {
         val tmp = copyToFile(ctx, uri, File(work, "_in.pdf"))
         val pfd = ParcelFileDescriptor.open(tmp, ParcelFileDescriptor.MODE_READ_ONLY)
         val pages = mutableListOf<Uri>()
         PdfRenderer(pfd).use { renderer ->
             for (i in 0 until renderer.pageCount) {
+                currentCoroutineContext().ensureActive()
                 renderer.openPage(i).use { page ->
                     // ~2000px de largura p/ leitura nítida sem estourar memória
                     val scale = (2000f / page.width).coerceIn(1f, 4f)
@@ -138,6 +159,7 @@ object PageLoader {
                     FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     bmp.recycle()
                     pages.add(Uri.fromFile(f))
+                    onProgress(pages.size, renderer.pageCount)
                 }
             }
         }
@@ -163,6 +185,23 @@ object PageLoader {
             FileOutputStream(dest).use { ins.copyTo(it) }
         }
         return dest
+    }
+
+    /** Extensão pelo nome; sem extensão conhecida (comum no "Abrir com"), deduz pelo MIME. */
+    private fun extensionOf(ctx: Context, uri: Uri, name: String): String {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext in IMAGE_EXT || ext in setOf("cbz", "zip", "epub", "cbr", "rar", "pdf")) return ext
+        val mime = ctx.contentResolver.getType(uri)?.lowercase() ?: return ext
+        return when (mime) {
+            "application/vnd.comicbook+zip", "application/x-cbz" -> "cbz"
+            "application/vnd.comicbook-rar", "application/x-cbr",
+            "application/x-rar-compressed", "application/vnd.rar" -> "cbr"
+            "application/zip" -> "zip"
+            "application/epub+zip" -> "epub"
+            "application/pdf" -> "pdf"
+            "image/x-ms-bmp" -> "bmp"
+            else -> mime.removePrefix("image/").takeIf { mime.startsWith("image/") && it in IMAGE_EXT } ?: ext
+        }
     }
 
     private fun displayName(ctx: Context, uri: Uri): String {

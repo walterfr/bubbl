@@ -1,30 +1,35 @@
 # Arquitetura
 
 Bubbl. é enxuto de propósito: duas telas, um pipeline. Sem banco, sem DI, sem
-camadas especulativas.
+camadas especulativas. O estado de leitura é um JSON pequeno em
+SharedPreferences.
 
 ## Visão geral
 
 ```
-MainActivity ──escolhe arquivo/pasta──▶ PageLoader ──List<Uri>──▶ BookHolder
-                                                                      │
-                                                                      ▼
-                                                              ReaderActivity
+MainActivity ──arquivo/pasta/recente──▶ PageLoader ──List<Uri>──▶ BookHolder
+     │                                                                │
+     └──── Intent (Uri de origem + flag de pasta) ──────────▶ ReaderActivity
                                                         (ViewPager2 de páginas)
                                                                       │
                                                                       ▼
                                                      SubsamplingScaleImageView
                                                         (tiling + tap-to-zoom)
+
+ReadingStore (SharedPreferences): página, direção e recentes por livro —
+gravado pelo reader, lido pela Home ("Continuar lendo") e pelo reader.
 ```
 
 ## Componentes
 
 | Arquivo | Papel |
 |---|---|
-| [`MainActivity.kt`](../app/src/main/java/com/bubbl/reader/MainActivity.kt) | Home. Abre arquivo (SAF `OpenDocument`) ou pasta (`OpenDocumentTree`). Carrega em `Dispatchers.IO`. |
-| [`PageLoader.kt`](../app/src/main/java/com/bubbl/reader/PageLoader.kt) | Converte qualquer entrada numa lista ordenada de `Uri` de página. |
-| [`BookHolder.kt`](../app/src/main/java/com/bubbl/reader/BookHolder.kt) | Singleton que passa as páginas entre Activities sem estourar o tamanho do Intent. |
-| [`ReaderActivity.kt`](../app/src/main/java/com/bubbl/reader/ReaderActivity.kt) | ViewPager2 de páginas, modo imersivo, chrome (voltar/slider) e o gesto de zoom. |
+| [`MainActivity.kt`](../app/src/main/java/com/bubbl/reader/MainActivity.kt) | Home. Abre arquivo (SAF `OpenDocument`), pasta (`OpenDocumentTree`) ou o que chega por "Abrir com…" (`ACTION_VIEW`), toma a permissão persistente do Uri, carrega em `Dispatchers.IO` com progresso/cancelar e lista "Continuar lendo". |
+| [`PageLoader.kt`](../app/src/main/java/com/bubbl/reader/PageLoader.kt) | Converte qualquer entrada numa lista ordenada de `Uri` de página. Funções `suspend`, canceláveis, com callback de progresso. |
+| [`BookHolder.kt`](../app/src/main/java/com/bubbl/reader/BookHolder.kt) | Singleton que passa as páginas (e o Uri de origem delas) entre Activities sem estourar o tamanho do Intent. |
+| [`ReadingStore.kt`](../app/src/main/java/com/bubbl/reader/ReadingStore.kt) | Persistência por livro (chave = Uri de origem): pasta, título, última página, total, direção e último acesso. SharedPreferences + JSON (`org.json`). |
+| [`Recents.kt`](../app/src/main/java/com/bubbl/reader/Recents.kt) | Lógica pura (testada em JVM): ordenar/deduplicar/limitar recentes a 10 e mapear página ↔ slider em LTR/RTL. |
+| [`ReaderActivity.kt`](../app/src/main/java/com/bubbl/reader/ReaderActivity.kt) | ViewPager2 de páginas, modo imersivo, chrome (voltar/direção/slider), o gesto de zoom e o salvamento da página. |
 
 ## Pipeline de páginas
 
@@ -46,6 +51,38 @@ Páginas ordenam por nome com comparação natural (`1, 2, 10`, não `1, 10, 2`)
 ignorando zeros à esquerda. Implementação e teste:
 [`PageLoader.compareNatural`](../app/src/main/java/com/bubbl/reader/PageLoader.kt) ·
 [`NaturalOrderTest.kt`](../app/src/test/java/com/bubbl/reader/NaturalOrderTest.kt).
+
+### Progresso e cancelamento
+
+`PageLoader.load`/`loadFolder` são `suspend` e chamam
+`currentCoroutineContext().ensureActive()` a cada entrada/página, reportando
+`onProgress(prontas, total?)` — `total` é nulo no ZIP (lido por stream). O
+callback roda na thread de IO; a Home reposta na main e mostra
+"Abrindo… 12 / 80" (ou "Abrindo… 12 páginas"). **Cancelar** cancela o `Job`; a
+`CancellationException` é relançada (nunca vira toast de erro). Uma nova
+abertura espera a anterior parar antes de reusar o `cacheDir/book`.
+
+## Estado de leitura e reabertura
+
+- **Chave do livro** = string do `Uri` de origem (arquivo ou árvore da pasta).
+  Ao abrir pelo seletor, `takePersistableUriPermission` (em `runCatching`: Uris
+  de "Abrir com" podem não ser persistíveis) mantém o acesso após reiniciar.
+- **Continuar de onde parou** — o reader abre na página salva e salva a cada
+  troca de página e no `onPause`.
+- **Recentes** — até 10, por último acesso; quem sai da lista tem a permissão
+  liberada. Toque reabre pelo mesmo fluxo de abertura; se falhar (arquivo
+  movido/permissão perdida), um diálogo oferece remover.
+- **Morte do processo** — o `Intent` do reader carrega o Uri de origem e o flag
+  de pasta. Se o Android matou o processo, `BookHolder.pages` volta vazio: o
+  reader mostra um indicador, recarrega via `PageLoader` em background e só
+  fecha (com aviso) se a recarga falhar.
+
+### Direção de leitura
+
+O botão do chrome superior alterna LTR/RTL e salva por livro. Em RTL,
+`ViewPager2.layoutDirection = RTL` (o deslize "avança" para a esquerda) e o
+slider inverte o mapeamento valor ↔ página (`PageSlider`): a página 1 fica na
+ponta direita. O contador "x / N" sempre mostra o número real da página.
 
 ## Zoom no balão (o recurso central)
 
@@ -93,8 +130,11 @@ Toque numa página em `ReaderActivity`:
   sob demanda por página se virar gargalo.
 - **EPUB** é tratado como zip de imagens (ordem por nome); EPUB de quadrinho
   baseado em texto (HTML) não é renderizado.
-- **Direção fixa** esquerda→direita (mangá costuma ser direita→esquerda).
-- **Um livro por vez.** Sem biblioteca, histórico ou marcadores.
+- **Sem biblioteca nem marcadores.** Há só "Continuar lendo" (10 recentes) e
+  a última página por livro.
+- **Reabrir re-extrai.** Voltar a um livro (ou recarregar após a morte do
+  processo) extrai tudo de novo para o cache; livros abertos via "Abrir com"
+  sem permissão persistível não reabrem depois que o processo morre.
 - **Conflito de swipe:** com a página ampliada, o arraste horizontal faz pan (não
   troca de página) até voltar ao enquadramento — comportamento esperado.
 

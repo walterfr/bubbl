@@ -10,6 +10,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Recarga do livro após a morte do processo -->
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/loading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminate="true"
+        android:visibility="gone"
+        app:indicatorColor="@color/violet" />
+
     <!-- Chrome superior -->
     <LinearLayout
         android:id="@+id/chromeTop"
@@ -43,6 +53,18 @@
             android:textColor="#FFFFFF"
             android:textSize="17sp"
             android:textStyle="bold" />
+
+        <!-- Alterna esquerda→direita / direita→esquerda (mangá) -->
+        <ImageButton
+            android:id="@+id/btnDirection"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_reading_direction"
+            android:background="@drawable/circle_scrim"
+            android:scaleType="centerInside"
+            android:visibility="gone"
+            android:contentDescription="@string/direction_ltr" />
     </LinearLayout>
 
     <!-- Chrome inferior -->

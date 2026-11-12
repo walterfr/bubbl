@@ -6,6 +6,18 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Continuar de onde parou**: a última página de cada livro é salva (ao trocar
+  de página e no `onPause`) e o reader reabre nela.
+- **"Continuar lendo"** na Home: até 10 livros recentes com título e
+  "página x de N"; toque reabre, toque longo remove (com Desfazer); livro que
+  não abre mais oferece remoção.
+- **Direção direita→esquerda (mangá)** por livro, com botão no chrome superior;
+  slider invertido em RTL.
+- **Progresso ao abrir** ("Abrindo… 12 / 80" ou "12 páginas") e botão
+  **Cancelar**.
+- Persistência do estado de leitura (`ReadingStore`, SharedPreferences + JSON)
+  e permissão persistente do Uri escolhido.
+- Testes JVM da lista de recentes e do mapeamento do slider em RTL.
 - **Zoom no balão**: o toque isola o balão sob o dedo (flood-fill), recorta
   **no formato da silhueta do balão** (máscara alpha) e o **infla ~2x no lugar**
   sobre a página. Toque único só amplia balão; zoom do documento é no toque
@@ -25,16 +37,30 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   projeto: GitHub Sponsors, Ko-fi, Buy Me a Coffee e PIX copia-e-cola.
 - CI (GitHub Actions): `test` + `lintDebug` + `assembleDebug`, com relatório
   de lint como artefato.
+- **"Abrir com…"**: o Bubbl. aparece para CBZ, CBR, PDF e EPUB vindos de
+  gerenciadores de arquivos e outros apps (`ACTION_VIEW`).
+- Formato deduzido pelo **MIME** quando o arquivo recebido não tem extensão.
+- **APK de release assinado**: workflow `release.yml` publica uma GitHub
+  Release com `bubbl-vX.Y.Z.apk` a cada tag `v*` (keystore via secrets).
+- Instruções de instalação (README) e de release (CONTRIBUTING).
 
 ### Alterado
+- `PageLoader.load`/`loadFolder` agora são `suspend`, canceláveis e reportam
+  progresso.
+- A Home rola (`ScrollView`) para caber em telas pequenas.
 - `compileSdk`/`targetSdk` 36, AGP 8.10, Kotlin 2.1, Gradle 8.11 e
   dependências AndroidX atualizadas.
 - Telas em **edge-to-edge** (obrigatório no targetSdk 35+), respeitando barras
   do sistema e recorte da câmera.
 - Release só com libs nativas ARM (`abiFilters`), reduzindo o APK.
 - Removido o repositório JitPack (dependências vêm do Maven Central/Google).
+- Versão **0.2.0** (`versionCode` 2).
+- Release com **R8** (minify + shrink de recursos) e regras para OpenCV e
+  junrar; a CI agora também roda `assembleRelease` em todo PR.
 
 ### Corrigido
+- O reader não fecha mais ao voltar depois que o Android matou o processo:
+  recarrega o livro a partir do Uri de origem.
 - OpenCV não escolhe mais contornos próximos cujo bbox apenas contém o toque;
   o ponto precisa estar dentro do próprio contorno.
 - O raio da busca local agora usa `LOCAL_SEARCH_RADIUS_FACTOR`, evitando um

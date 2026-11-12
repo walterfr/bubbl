@@ -1,6 +1,8 @@
 package com.bubbl.reader
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.Rect
@@ -17,6 +19,7 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -28,27 +31,47 @@ import androidx.viewpager2.widget.ViewPager2
 import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.google.android.material.slider.Slider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ReaderActivity : AppCompatActivity() {
 
+    companion object {
+        private const val EXTRA_SOURCE = "com.bubbl.reader.SOURCE"
+        private const val EXTRA_FOLDER = "com.bubbl.reader.FOLDER"
+
+        /** Uri de origem e flag de pasta vão no Intent p/ reabrir após a morte do processo. */
+        fun intent(ctx: Context, source: Uri, folder: Boolean): Intent =
+            Intent(ctx, ReaderActivity::class.java)
+                .putExtra(EXTRA_SOURCE, source.toString())
+                .putExtra(EXTRA_FOLDER, folder)
+    }
+
+    private lateinit var pager: ViewPager2
+    private lateinit var label: TextView
+    private lateinit var slider: Slider
+    private lateinit var btnDirection: ImageButton
+    private lateinit var loading: View
     private lateinit var overlay: View
     private lateinit var balloonImage: ImageView
     private var balloonBmp: Bitmap? = null
+
+    private var key: String? = null
+    private var pages: List<Uri> = emptyList()
+    private var rtl = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reader)
         goImmersive()
 
-        val pages = BookHolder.pages
-        if (pages.isEmpty()) { finish(); return }
-
-        val pager = findViewById<ViewPager2>(R.id.pager)
-        val label = findViewById<TextView>(R.id.pageLabel)
-        val slider = findViewById<Slider>(R.id.pageSlider)
+        pager = findViewById(R.id.pager)
+        label = findViewById(R.id.pageLabel)
+        slider = findViewById(R.id.pageSlider)
+        btnDirection = findViewById(R.id.btnDirection)
+        loading = findViewById(R.id.loading)
         overlay = findViewById(R.id.balloonOverlay)
         balloonImage = findViewById(R.id.balloonImage)
         // barras escondidas, mas o recorte da câmera ainda pode cobrir o chrome
@@ -56,30 +79,7 @@ class ReaderActivity : AppCompatActivity() {
         findViewById<View>(R.id.chromeTop).padForInsets(cutout, bottom = false)
         findViewById<View>(R.id.chromeBottom).padForInsets(cutout, top = false)
         overlay.setOnClickListener { hideBalloon() }
-
-        findViewById<TextView>(R.id.title).text = BookHolder.title
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
-
-        pager.adapter = PageAdapter(pages) { view, uri, sx, sy -> onTap(view, uri, sx, sy) }
-        label.text = "1 / ${pages.size}"
-
-        if (pages.size < 2) {
-            slider.visibility = View.GONE
-        } else {
-            slider.valueFrom = 1f
-            slider.valueTo = pages.size.toFloat()
-            slider.value = 1f
-            slider.addOnChangeListener { _, value, fromUser ->
-                if (fromUser) pager.setCurrentItem(value.toInt() - 1, false)
-            }
-        }
-
-        pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                label.text = "${position + 1} / ${pages.size}"
-                if (pages.size >= 2) slider.value = (position + 1).toFloat()
-            }
-        })
 
         // Back fecha o overlay antes de sair
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -88,6 +88,122 @@ class ReaderActivity : AppCompatActivity() {
                 else { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
             }
         })
+
+        val source = intent.getStringExtra(EXTRA_SOURCE)
+        val folder = intent.getBooleanExtra(EXTRA_FOLDER, false)
+        key = source
+        val held = BookHolder.pages
+        when {
+            held.isNotEmpty() && (source == null || source == BookHolder.source) -> setup(held)
+            source != null -> reload(Uri.parse(source), folder)
+            else -> finish()
+        }
+    }
+
+    /** Processo morreu (BookHolder vazio): recarrega o livro a partir dos extras. */
+    private fun reload(source: Uri, folder: Boolean) {
+        key?.let { k -> ReadingStore.get(this, k)?.let { setTitleText(it.title) } }
+        loading.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val loaded = try {
+                withContext(Dispatchers.IO) {
+                    if (folder) PageLoader.loadFolder(this@ReaderActivity, source)
+                    else PageLoader.load(this@ReaderActivity, source)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                null
+            }
+            loading.visibility = View.GONE
+            if (loaded.isNullOrEmpty()) {
+                Toast.makeText(this@ReaderActivity, R.string.reopen_failed, Toast.LENGTH_LONG).show()
+                finish()
+                return@launch
+            }
+            BookHolder.pages = loaded
+            BookHolder.source = source.toString()
+            setup(loaded)
+        }
+    }
+
+    private fun setup(pages: List<Uri>) {
+        this.pages = pages
+        val entry = key?.let { ReadingStore.get(this, it) }
+        setTitleText(BookHolder.title.ifEmpty { entry?.title.orEmpty() })
+        val start = Recents.clampPage(entry?.page ?: 0, pages.size)
+        rtl = entry?.rtl ?: false
+        // direção antes do adapter: o ViewPager2 já nasce no sentido certo
+        pager.layoutDirection = if (rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        updateDirectionButton()
+        btnDirection.visibility = View.VISIBLE
+        btnDirection.setOnClickListener { toggleDirection() }
+
+        pager.adapter = PageAdapter(pages) { view, uri, sx, sy -> onTap(view, uri, sx, sy) }
+
+        if (pages.size < 2) {
+            slider.visibility = View.GONE
+        } else {
+            slider.valueFrom = 1f
+            slider.valueTo = pages.size.toFloat()
+            slider.value = PageSlider.valueFor(start, pages.size, rtl)
+            slider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser) pager.setCurrentItem(PageSlider.indexFor(value, pages.size, rtl), false)
+            }
+        }
+
+        pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateChrome(position)
+                savePage(position)
+            }
+        })
+        pager.setCurrentItem(start, false)
+        updateChrome(start)
+    }
+
+    private fun updateChrome(position: Int) {
+        label.text = getString(R.string.page_counter, position + 1, pages.size)
+        if (pages.size >= 2) slider.value = PageSlider.valueFor(position, pages.size, rtl)
+    }
+
+    /** Alterna LTR/RTL (mangá), persistido por livro; mantém a página atual. */
+    private fun toggleDirection() {
+        rtl = !rtl
+        key?.let { ReadingStore.setRtl(this, it, rtl) }
+        val current = pager.currentItem
+        pager.layoutDirection = if (rtl) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        // força o RecyclerView interno a refazer o layout no novo sentido, na mesma página
+        (pager.getChildAt(0) as? RecyclerView)?.scrollToPosition(current)
+        updateChrome(current)
+        updateDirectionButton()
+        Toast.makeText(
+            this,
+            if (rtl) R.string.direction_changed_rtl else R.string.direction_changed_ltr,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun updateDirectionButton() {
+        // o ícone aponta para a direita; em RTL é espelhado
+        btnDirection.scaleX = if (rtl) -1f else 1f
+        btnDirection.contentDescription =
+            getString(if (rtl) R.string.direction_rtl else R.string.direction_ltr)
+    }
+
+    private fun savePage(position: Int = pager.currentItem) {
+        val k = key ?: return
+        if (pages.isEmpty()) return
+        ReadingStore.savePage(this, k, position)
+    }
+
+    private fun setTitleText(t: String) {
+        findViewById<TextView>(R.id.title).text = t
+    }
+
+    override fun onPause() {
+        super.onPause()
+        savePage()
     }
 
     /** Toque numa página: tenta isolar o balão; se não achar, zoom no ponto. */

@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BUBBL_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.BUBBL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.BUBBL_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.BUBBL_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Secret BUBBL_$v ausente. Veja a seção Release do CONTRIBUTING.md."
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/bubbl.jks"
+          {
+            echo "BUBBL_KEYSTORE_PATH=$RUNNER_TEMP/bubbl.jks"
+            echo "BUBBL_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "BUBBL_KEY_ALIAS=$KEY_ALIAS"
+            echo "BUBBL_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Test and assemble release APK
+        run: ./gradlew test assembleRelease --stacktrace
+
+      - name: Rename APK
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::$apk não encontrado (APK não foi assinado?)"
+            ls -la app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          mv "$apk" "bubbl-${{ github.ref_name }}.apk"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bubbl-${{ github.ref_name }}.apk
+          generate_release_notes: true

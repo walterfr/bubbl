@@ -112,7 +112,7 @@ class ReaderActivity : AppCompatActivity() {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 null
             }
             loading.visibility = View.GONE

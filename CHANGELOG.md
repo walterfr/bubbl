@@ -6,6 +6,18 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 ## [Não lançado]
 
 ### Adicionado
+- **Continuar de onde parou**: a última página de cada livro é salva (ao trocar
+  de página e no `onPause`) e o reader reabre nela.
+- **"Continuar lendo"** na Home: até 10 livros recentes com título e
+  "página x de N"; toque reabre, toque longo remove (com Desfazer); livro que
+  não abre mais oferece remoção.
+- **Direção direita→esquerda (mangá)** por livro, com botão no chrome superior;
+  slider invertido em RTL.
+- **Progresso ao abrir** ("Abrindo… 12 / 80" ou "12 páginas") e botão
+  **Cancelar**.
+- Persistência do estado de leitura (`ReadingStore`, SharedPreferences + JSON)
+  e permissão persistente do Uri escolhido.
+- Testes JVM da lista de recentes e do mapeamento do slider em RTL.
 - **Zoom no balão**: o toque isola o balão sob o dedo (flood-fill), recorta
   **no formato da silhueta do balão** (máscara alpha) e o **infla ~2x no lugar**
   sobre a página. Toque único só amplia balão; zoom do documento é no toque
@@ -33,6 +45,9 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 - Instruções de instalação (README) e de release (CONTRIBUTING).
 
 ### Alterado
+- `PageLoader.load`/`loadFolder` agora são `suspend`, canceláveis e reportam
+  progresso.
+- A Home rola (`ScrollView`) para caber em telas pequenas.
 - `compileSdk`/`targetSdk` 36, AGP 8.10, Kotlin 2.1, Gradle 8.11 e
   dependências AndroidX atualizadas.
 - Telas em **edge-to-edge** (obrigatório no targetSdk 35+), respeitando barras
@@ -44,6 +59,8 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   junrar; a CI agora também roda `assembleRelease` em todo PR.
 
 ### Corrigido
+- O reader não fecha mais ao voltar depois que o Android matou o processo:
+  recarrega o livro a partir do Uri de origem.
 - OpenCV não escolhe mais contornos próximos cujo bbox apenas contém o toque;
   o ponto precisa estar dentro do próprio contorno.
 - O raio da busca local agora usa `LOCAL_SEARCH_RADIUS_FACTOR`, evitando um

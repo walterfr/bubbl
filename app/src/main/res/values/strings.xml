@@ -19,4 +19,29 @@
     <!-- PIX: payload copia-e-cola (BR Code). Botão copia isto. -->
     <string name="donation_intro">Bubbl. é gratuito e sem anúncios. Se ele te ajuda, considere apoiar o projeto.</string>
     <string name="pix_payload">00020101021126400014br.gov.bcb.pix0118walterfr@gmail.com5204000053039865802BR5915WALTER REBOUCAS6009FORTALEZA62070503***63045603</string>
+
+    <!-- Home: abertura -->
+    <string name="opening">Abrindo…</string>
+    <string name="opening_progress">Abrindo… %1$d / %2$d</string>
+    <string name="opening_count">Abrindo… %1$d páginas</string>
+    <string name="cancel">Cancelar</string>
+    <string name="no_pages">Nenhuma página encontrada</string>
+    <string name="open_failed">Falha ao abrir</string>
+
+    <!-- Home: continuar lendo -->
+    <string name="recent_header">Continuar lendo</string>
+    <string name="recent_progress">Página %1$d de %2$d</string>
+    <string name="recent_removed">“%1$s” removido da lista</string>
+    <string name="recent_unavailable">Não foi possível abrir. O arquivo pode ter sido movido ou apagado, ou o acesso expirou. Remover da lista?</string>
+    <string name="undo">Desfazer</string>
+    <string name="remove">Remover</string>
+    <string name="close">Fechar</string>
+
+    <!-- Leitor -->
+    <string name="page_counter">%1$d / %2$d</string>
+    <string name="direction_ltr">Leitura da esquerda para a direita. Tocar para inverter</string>
+    <string name="direction_rtl">Leitura da direita para a esquerda (mangá). Tocar para inverter</string>
+    <string name="direction_changed_ltr">Leitura: esquerda → direita</string>
+    <string name="direction_changed_rtl">Leitura: direita → esquerda (mangá)</string>
+    <string name="reopen_failed">Não foi possível reabrir o livro</string>
 </resources>
